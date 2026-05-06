@@ -1,3 +1,6 @@
+import { kv } from '@vercel/kv';
+import { getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } from './_utils.js';
+
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
 
 When given a form name, you return a structured JSON object with EXACTLY this shape:
@@ -36,12 +39,41 @@ If you do not recognise the form name or cannot provide reliable information, re
 Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation outside the JSON object.`;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method !== 'POST') return res.status(405).end();
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // Auth
+  const token = getSessionToken(req);
+  if (!token) return res.status(401).json({ error: 'auth_required' });
+
+  const email = await kv.get(`session:${token}`);
+  if (!email) return res.status(401).json({ error: 'session_expired' });
+
+  const user = await kv.get(`user:${email}`);
+  if (!user) return res.status(401).json({ error: 'user_not_found' });
+
+  // Free plan restrictions
+  if (user.plan === 'free') {
+    if (isTrialExpired(user)) {
+      return res.status(403).json({
+        error: 'trial_expired',
+        message: 'Your 7-day free trial has ended. Upgrade to Pro to continue.',
+      });
+    }
+
+    const today = getTodayKey();
+    const usageKey = `usage:${email}:${today}`;
+    const dailyCount = (await kv.get(usageKey)) || 0;
+
+    if (dailyCount >= DAILY_LIMIT) {
+      return res.status(429).json({
+        error: 'daily_limit',
+        message: `You've used all ${DAILY_LIMIT} lookups for today. Come back tomorrow, or upgrade to Pro for unlimited access.`,
+      });
+    }
+
+    // 25h TTL so it always resets by next day regardless of timezone
+    await kv.set(usageKey, dailyCount + 1, { ex: 25 * 60 * 60 });
+  }
 
   const { formName } = req.body || {};
   if (!formName || typeof formName !== 'string') {
@@ -49,9 +81,7 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY environment variable is not set' });
-  }
+  if (!apiKey) return res.status(500).json({ error: 'Server not configured' });
 
   try {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {

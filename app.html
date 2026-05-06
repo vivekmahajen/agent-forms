@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FormIQ — Form Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { background: #FAFAF8; margin: 0; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulseOpacity { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in    { animation: fadeInUp 0.35s ease-out forwards; }
+    .pulse-anim { animation: pulseOpacity 1.6s ease-in-out infinite; }
+    .spinner    { animation: spin 0.75s linear infinite; }
+    .tab-active { border-bottom: 2.5px solid #F59E0B !important; color: #0F1E3C !important; font-weight: 600 !important; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+  const { useState, useEffect, useCallback } = React;
+
+  /* ── Shared styles ──────────────────────────────────────────── */
+  const S = {
+    card:   { background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
+    infoBox:{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.875rem 1rem' },
+    label:  { fontFamily: 'Inter', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' },
+    body:   { fontFamily: 'Inter', fontSize: '0.9rem', color: '#334155', lineHeight: 1.65 },
+  };
+
+  /* ── ProBadge ───────────────────────────────────────────────── */
+  function ProBadge() {
+    const [tip, setTip] = useState(false);
+    return (
+      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: '8px' }}>
+        <button
+          onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+          onFocus={() => setTip(true)} onBlur={() => setTip(false)}
+          aria-label="Upgrade to Pro for PDF export, form history, and team sharing"
+          style={{ background: '#F59E0B', color: '#0F1E3C', border: 'none', borderRadius: '999px', padding: '2px 9px', fontSize: '0.68rem', fontFamily: 'Inter', fontWeight: 700, cursor: 'default', letterSpacing: '0.04em' }}
+        >PRO</button>
+        {tip && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
+            background: '#0F1E3C', color: '#e2e8f0', borderRadius: '8px', padding: '0.6rem 0.85rem',
+            fontSize: '0.78rem', fontFamily: 'Inter', lineHeight: 1.5, whiteSpace: 'nowrap', zIndex: 100,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)', pointerEvents: 'none',
+          }}>
+            Upgrade to Pro for PDF export, form history,<br/>and team sharing — $29/month
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ── Header ─────────────────────────────────────────────────── */
+  function Header({ user }) {
+    const logout = async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/';
+    };
+
+    const daysLeft      = user?.daysLeft;
+    const trialExpired  = user?.trialExpired;
+    const dailyCount    = user?.dailyCount ?? 0;
+    const dailyLimit    = user?.dailyLimit;
+    const plan          = user?.plan;
+
+    return (
+      <header style={{ background: '#0F1E3C', borderBottom: '1px solid #1e3560' }}>
+        <div style={{
+          maxWidth: '720px', margin: '0 auto', padding: '0.875rem 1.25rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem',
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.3rem' }} aria-hidden="true">📋</span>
+            <span style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.35rem', color: '#FAFAF8' }}>FormIQ</span>
+          </div>
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {user && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                <span style={{ fontFamily: 'Inter', fontSize: '0.72rem', color: '#64748b' }}>{user.email}</span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {plan === 'free' && !trialExpired && (
+                    <>
+                      <span style={{ fontFamily: 'Inter', fontSize: '0.72rem', color: '#94a3b8' }}>
+                        <span style={{ color: '#F59E0B', fontWeight: 600 }}>{dailyCount}</span>/{dailyLimit} today
+                      </span>
+                      <span style={{ color: '#2e4470', fontSize: '0.72rem' }}>·</span>
+                      <span style={{ fontFamily: 'Inter', fontSize: '0.72rem', color: daysLeft <= 1 ? '#f87171' : '#94a3b8' }}>
+                        {daysLeft === 0 ? 'Trial ends today' : `${daysLeft}d trial left`}
+                      </span>
+                    </>
+                  )}
+                  {plan === 'pro' && (
+                    <span style={{ fontFamily: 'Inter', fontSize: '0.72rem', color: '#F59E0B', fontWeight: 600 }}>Pro</span>
+                  )}
+                  {trialExpired && (
+                    <span style={{ fontFamily: 'Inter', fontSize: '0.72rem', color: '#f87171' }}>Trial ended</span>
+                  )}
+                </div>
+              </div>
+            )}
+            <button onClick={logout} style={{
+              background: 'none', border: '1px solid #2e4470', borderRadius: '6px',
+              padding: '0.3rem 0.75rem', fontFamily: 'Inter', fontSize: '0.72rem',
+              color: '#94a3b8', cursor: 'pointer',
+            }}>Sign out</button>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  /* ── SearchBar ──────────────────────────────────────────────── */
+  function SearchBar({ query, setQuery, onSubmit, loading }) {
+    return (
+      <form onSubmit={onSubmit} style={{ marginBottom: '1.25rem' }}>
+        <label htmlFor="form-search" style={{
+          display: 'block', fontFamily: '"DM Serif Display", serif',
+          fontSize: '1.75rem', color: '#0F1E3C', marginBottom: '0.85rem', lineHeight: 1.25,
+        }}>
+          What form do you need help with?
+        </label>
+        <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+          <input
+            id="form-search" type="text" value={query}
+            onChange={e => setQuery(e.target.value)} disabled={loading}
+            placeholder="Enter a form name, e.g. W-2, I-9, DS-160..."
+            aria-label="Form name"
+            style={{
+              flex: '1 1 200px', padding: '0.825rem 1rem', fontSize: '1rem',
+              fontFamily: 'Inter', border: '1.5px solid #d1d5db', borderRadius: '8px',
+              outline: 'none', color: '#0F1E3C', background: '#fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.05)', transition: 'border-color 0.15s',
+            }}
+            onFocus={e => (e.target.style.borderColor = '#F59E0B')}
+            onBlur={e  => (e.target.style.borderColor = '#d1d5db')}
+          />
+          <button type="submit" disabled={loading || !query.trim()} aria-label="Look up this form" style={{
+            padding: '0.825rem 1.5rem', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Inter',
+            background: loading || !query.trim() ? '#94a3b8' : '#0F1E3C', color: '#FAFAF8',
+            border: 'none', borderRadius: '8px',
+            cursor: loading || !query.trim() ? 'not-allowed' : 'pointer',
+            whiteSpace: 'nowrap', transition: 'background 0.15s',
+          }}>
+            {loading ? 'Looking up…' : 'Look Up Form'}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  /* ── HistoryChips ───────────────────────────────────────────── */
+  function HistoryChips({ history, onSelect }) {
+    if (!history.length) return null;
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'Inter', marginRight: '2px' }}>Recent:</span>
+        {history.map(name => (
+          <button key={name} onClick={() => onSelect(name)} aria-label={`Re-search ${name}`}
+            style={{
+              padding: '0.2rem 0.7rem', fontSize: '0.78rem', fontFamily: '"IBM Plex Mono", monospace',
+              background: '#fff', border: '1.5px solid #0F1E3C', borderRadius: '999px',
+              color: '#0F1E3C', cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#0F1E3C'; e.currentTarget.style.color = '#FAFAF8'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff';    e.currentTarget.style.color = '#0F1E3C'; }}
+          >{name}</button>
+        ))}
+      </div>
+    );
+  }
+
+  /* ── LoadingState ───────────────────────────────────────────── */
+  function LoadingState({ formName }) {
+    return (
+      <div className="fade-in" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+        <div className="spinner" role="status" aria-label="Loading" style={{
+          display: 'inline-block', width: '38px', height: '38px',
+          border: '3px solid #e2e8f0', borderTopColor: '#F59E0B', borderRadius: '50%',
+        }} />
+        <p className="pulse-anim" style={{ marginTop: '1rem', fontFamily: 'Inter', color: '#64748b', fontSize: '0.95rem' }}>
+          Looking up <strong style={{ color: '#0F1E3C' }}>{formName}</strong>…
+        </p>
+      </div>
+    );
+  }
+
+  /* ── ErrorState ─────────────────────────────────────────────── */
+  function ErrorState({ message }) {
+    return (
+      <div className="fade-in" role="alert" style={{
+        display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+        padding: '1rem 1.25rem', background: '#fff8f0',
+        border: '1.5px solid #fcd9a0', borderRadius: '10px',
+      }}>
+        <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>⚠️</span>
+        <p style={{ margin: 0, fontFamily: 'Inter', fontSize: '0.9rem', color: '#7c2d12', lineHeight: 1.55 }}>{message}</p>
+      </div>
+    );
+  }
+
+  /* ── Tabs ───────────────────────────────────────────────────── */
+  const TABS = [
+    { id: 'overview',     label: 'Overview' },
+    { id: 'instructions', label: 'Instructions' },
+    { id: 'sample',       label: 'Filled Sample' },
+  ];
+
+  function TabBar({ active, setActive }) {
+    return (
+      <div role="tablist" style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #e2e8f0', marginBottom: '1.5rem' }}>
+        {TABS.map(tab => (
+          <button key={tab.id} role="tab" aria-selected={active === tab.id}
+            aria-controls={`panel-${tab.id}`} id={`tab-${tab.id}`}
+            onClick={() => setActive(tab.id)}
+            className={active === tab.id ? 'tab-active' : ''}
+            style={{
+              padding: '0.7rem 1.1rem', fontFamily: 'Inter', fontSize: '0.875rem',
+              fontWeight: 400, color: '#6b7280', background: 'none', border: 'none',
+              borderBottom: '2.5px solid transparent', marginBottom: '-2px', cursor: 'pointer',
+            }}
+          >{tab.label}</button>
+        ))}
+        <ProBadge />
+      </div>
+    );
+  }
+
+  /* ── Overview ───────────────────────────────────────────────── */
+  function InfoBox({ label, children }) {
+    return (
+      <div style={S.infoBox}>
+        <p style={{ ...S.label, margin: '0 0 0.4rem' }}>{label}</p>
+        {children}
+      </div>
+    );
+  }
+
+  function OverviewTab({ r }) {
+    return (
+      <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.45rem', color: '#0F1E3C', margin: '0 0 0.2rem' }}>
+            {r.form_name}
+          </h2>
+          {r.common_name && r.common_name !== r.form_name && (
+            <p style={{ margin: 0, fontFamily: 'Inter', fontSize: '0.82rem', color: '#64748b' }}>
+              Also known as: <em>{r.common_name}</em>
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <InfoBox label="Issued By"><p style={{ ...S.body, margin: 0 }}>{r.issued_by}</p></InfoBox>
+          <InfoBox label="Purpose"><p style={{ ...S.body, margin: 0 }}>{r.purpose}</p></InfoBox>
+          <InfoBox label="Who Needs It">
+            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+              {r.who_needs_it.map((item, i) => <li key={i} style={{ ...S.body, marginBottom: '0.2rem' }}>{item}</li>)}
+            </ul>
+          </InfoBox>
+          {r.deadline      && <InfoBox label="Deadline / When to File"><p style={{ ...S.body, margin: 0 }}>{r.deadline}</p></InfoBox>}
+          {r.where_to_submit && <InfoBox label="Where to Submit"><p style={{ ...S.body, margin: 0 }}>{r.where_to_submit}</p></InfoBox>}
+        </div>
+      </section>
+    );
+  }
+
+  /* ── Instructions ───────────────────────────────────────────── */
+  function InstructionsTab({ r }) {
+    return (
+      <section id="panel-instructions" role="tabpanel" aria-labelledby="tab-instructions">
+        <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {r.instructions.map((item, i) => (
+            <li key={i} style={{ display: 'flex', gap: '0.875rem', alignItems: 'flex-start', ...S.infoBox }}>
+              <span style={{
+                flexShrink: 0, width: '26px', height: '26px', borderRadius: '50%',
+                background: '#0F1E3C', color: '#FAFAF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'Inter', fontSize: '0.72rem', fontWeight: 700, marginTop: '1px',
+              }}>{i + 1}</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: '0 0 0.3rem', fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.83rem', fontWeight: 500, color: '#0F1E3C' }}>{item.field}</p>
+                <p style={{ ...S.body, margin: 0, fontSize: '0.875rem' }}>{item.instruction}</p>
+                {item.warning && (
+                  <p style={{ margin: '0.5rem 0 0', fontFamily: 'Inter', fontSize: '0.8rem', color: '#92400e', lineHeight: 1.5, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '5px', padding: '0.35rem 0.6rem' }}>
+                    ⚠️ {item.warning}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+        {r.tips && r.tips.length > 0 && (
+          <div style={{ marginTop: '1.25rem', padding: '1rem 1.125rem', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px' }}>
+            <p style={{ ...S.label, margin: '0 0 0.6rem', color: '#15803d' }}>💡 Pro Tips</p>
+            <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {r.tips.map((tip, i) => <li key={i} style={{ fontFamily: 'Inter', fontSize: '0.875rem', color: '#166534', lineHeight: 1.55 }}>{tip}</li>)}
+            </ul>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  /* ── Sample ─────────────────────────────────────────────────── */
+  function SampleTab({ r }) {
+    return (
+      <section id="panel-sample" role="tabpanel" aria-labelledby="tab-sample" style={{ position: 'relative' }}>
+        <div aria-hidden="true" style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%) rotate(-18deg)',
+          fontFamily: '"DM Serif Display", serif', fontSize: '1.6rem',
+          color: 'rgba(15,30,60,0.07)', letterSpacing: '0.12em',
+          pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 0, userSelect: 'none',
+        }}>SAMPLE — NOT FOR SUBMISSION</div>
+        <div style={{ position: 'relative', zIndex: 1, background: '#fff', border: '2px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+          <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: '#f8fafc' }}>
+            <div>
+              <p style={{ margin: 0, fontFamily: '"DM Serif Display", serif', fontSize: '0.95rem', color: '#0F1E3C' }}>{r.form_name}</p>
+              <p style={{ margin: '2px 0 0', fontFamily: 'Inter', fontSize: '0.72rem', color: '#64748b' }}>Sample completion · Alex Rivera</p>
+            </div>
+            <span style={{ padding: '0.2rem 0.65rem', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '4px', fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.68rem', color: '#92400e', fontWeight: 500 }}>SAMPLE</span>
+          </div>
+          <div>
+            {r.sample.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.55rem 1.125rem', background: i % 2 === 0 ? '#fff' : '#f8fafc', flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.78rem', color: '#64748b', minWidth: '170px', flexShrink: 0 }}>{item.field}</span>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', flexShrink: 0 }}>→</span>
+                <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.78rem', color: '#0F1E3C', fontWeight: 500, flex: 1 }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p style={{ marginTop: '0.6rem', textAlign: 'center', fontFamily: 'Inter', fontSize: '0.72rem', color: '#94a3b8' }}>
+          Fictional data only. Do not use on an actual form.
+        </p>
+      </section>
+    );
+  }
+
+  /* ── ResultsPanel ───────────────────────────────────────────── */
+  function ResultsPanel({ result, activeTab, setActiveTab }) {
+    return (
+      <div className="fade-in" style={{ ...S.card, padding: '1.5rem' }}>
+        <TabBar active={activeTab} setActive={setActiveTab} />
+        {activeTab === 'overview'     && <OverviewTab     r={result} />}
+        {activeTab === 'instructions' && <InstructionsTab r={result} />}
+        {activeTab === 'sample'       && <SampleTab       r={result} />}
+      </div>
+    );
+  }
+
+  /* ── Upgrade Modal ──────────────────────────────────────────── */
+  function UpgradeModal({ reason, onClose }) {
+    const isExpired = reason === 'trial_expired';
+    return (
+      <div role="dialog" aria-modal="true"
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,30,60,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200, padding: '1rem',
+        }}>
+        <div style={{
+          background: '#fff', borderRadius: '14px', padding: '2rem',
+          maxWidth: '460px', width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+          position: 'relative', textAlign: 'center',
+        }}>
+          <button onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', fontSize: '1.4rem', color: '#9ca3af', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
+            {isExpired ? '⏱️' : '🔒'}
+          </div>
+          <h2 style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.45rem', color: '#0F1E3C', margin: '0 0 0.6rem' }}>
+            {isExpired ? 'Your free trial has ended' : "You've hit today's limit"}
+          </h2>
+          <p style={{ fontFamily: 'Inter', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
+            {isExpired
+              ? 'Your 7-day free trial is over. Upgrade to Pro for unlimited lookups, PDF export, and more.'
+              : "You've used all 10 free lookups for today. Come back tomorrow, or upgrade to Pro for unlimited access."}
+          </p>
+          <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
+            <p style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.85rem', color: '#0F1E3C', margin: '0 0 0.15rem' }}>$29/month</p>
+            <p style={{ margin: 0, fontFamily: 'Inter', fontSize: '0.78rem', color: '#94a3b8' }}>Cancel anytime · No commitment</p>
+          </div>
+          <a href="/" style={{
+            display: 'block', padding: '0.85rem',
+            background: '#F59E0B', color: '#0F1E3C',
+            borderRadius: '8px', fontFamily: 'Inter', fontWeight: 700, fontSize: '0.95rem',
+            textDecoration: 'none', marginBottom: '0.65rem',
+          }}>
+            Upgrade to Pro →
+          </a>
+          {!isExpired && (
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'Inter', fontSize: '0.8rem', color: '#94a3b8', cursor: 'pointer' }}>
+              I'll come back tomorrow
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  function Footer() {
+    return (
+      <footer style={{ maxWidth: '720px', margin: '2rem auto 0', padding: '1.25rem 1.25rem 2rem', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+        <p style={{ margin: 0, fontFamily: 'Inter', fontSize: '0.73rem', color: '#9ca3af', lineHeight: 1.65 }}>
+          FormIQ provides AI-generated guidance for informational purposes only. Always verify form instructions with the issuing agency. Not legal or tax advice.
+        </p>
+      </footer>
+    );
+  }
+
+  /* ── App ────────────────────────────────────────────────────── */
+  function App() {
+    const [user,      setUser]      = useState(null);
+    const [authReady, setAuthReady] = useState(false);
+
+    const [query,     setQuery]     = useState('');
+    const [loading,   setLoading]   = useState(false);
+    const [result,    setResult]    = useState(null);
+    const [error,     setError]     = useState(null);
+    const [activeTab, setActiveTab] = useState('overview');
+    const [history,   setHistory]   = useState([]);
+    const [upgrade,   setUpgrade]   = useState(null); // 'trial_expired' | 'daily_limit'
+
+    // Auth check on mount
+    useEffect(() => {
+      fetch('/api/me')
+        .then(r => {
+          if (r.status === 401) { window.location.href = '/'; return null; }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          setUser(data);
+          if (data.trialExpired) setUpgrade('trial_expired');
+          setAuthReady(true);
+        })
+        .catch(() => { window.location.href = '/'; });
+    }, []);
+
+    const refreshUser = useCallback(() => {
+      fetch('/api/me').then(r => r.json()).then(setUser).catch(() => {});
+    }, []);
+
+    const lookup = useCallback(async (formName) => {
+      setLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        const res = await fetch('/api/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formName }),
+        });
+
+        if (res.status === 401) { window.location.href = '/'; return; }
+        if (res.status === 403 || res.status === 429) {
+          const body = await res.json();
+          setUpgrade(body.error);
+          return;
+        }
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Server error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        const parsed = JSON.parse(text);
+
+        // Refresh usage counts from server
+        refreshUser();
+
+        if (!parsed.found) {
+          setError(parsed.message || "We couldn't find that form. Try a more specific name (e.g. 'IRS Form 1040').");
+        } else {
+          setResult(parsed);
+          setActiveTab('overview');
+          setHistory(prev => {
+            const deduped = prev.filter(h => h.toLowerCase() !== formName.toLowerCase());
+            return [formName, ...deduped].slice(0, 5);
+          });
+        }
+      } catch (err) {
+        setError(err instanceof SyntaxError
+          ? 'Something went wrong parsing the response. Please try again.'
+          : `Something went wrong: ${err.message}. Please try again.`
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, [refreshUser]);
+
+    const handleSubmit = e => {
+      e.preventDefault();
+      if (!query.trim()) return;
+      lookup(query.trim());
+    };
+
+    // Show nothing while checking auth
+    if (!authReady) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          <div className="spinner" style={{ width: '36px', height: '36px', border: '3px solid #e2e8f0', borderTopColor: '#F59E0B', borderRadius: '50%' }} />
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ background: '#FAFAF8', minHeight: '100vh' }}>
+        <Header user={user} />
+
+        <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2rem 1.25rem 1rem' }}>
+          <SearchBar query={query} setQuery={setQuery} onSubmit={handleSubmit} loading={loading} />
+          <HistoryChips history={history} onSelect={name => { setQuery(name); lookup(name); }} />
+
+          <div aria-live="polite" aria-atomic="false">
+            {loading            && <LoadingState formName={query} />}
+            {!loading && error  && <ErrorState   message={error} />}
+            {!loading && result && <ResultsPanel result={result} activeTab={activeTab} setActiveTab={setActiveTab} />}
+          </div>
+        </main>
+
+        <Footer />
+
+        {upgrade && <UpgradeModal reason={upgrade} onClose={() => setUpgrade(null)} />}
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
