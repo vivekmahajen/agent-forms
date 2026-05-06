@@ -46,10 +46,8 @@
     .pulse-anim { animation: pulseOpacity 1.6s ease-in-out infinite; }
     .spinner    { animation: spin 0.75s linear infinite; }
 
-    /* Tab active underline */
     .tab-active { border-bottom: 2.5px solid #F59E0B !important; color: #0F1E3C !important; font-weight: 600 !important; }
 
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -63,48 +61,9 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
-    const { useState, useRef, useCallback } = React;
+    const { useState, useCallback } = React;
 
-    /* ─── Constants ──────────────────────────────────────────────── */
-    const MODEL = "claude-sonnet-4-20250514";
     const MAX_FREE = 5;
-
-    const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
-
-When given a form name, you return a structured JSON object with EXACTLY this shape:
-
-{
-  "found": true,
-  "form_name": "Official full name of the form",
-  "common_name": "What people commonly call it",
-  "issued_by": "The agency or organisation that issues it",
-  "purpose": "2-3 sentence plain English explanation of what this form is for",
-  "who_needs_it": ["bullet 1", "bullet 2", "bullet 3"],
-  "deadline": "When it must be filed, or null if not applicable",
-  "where_to_submit": "Where to send or submit it, or null if not applicable",
-  "instructions": [
-    {
-      "field": "Exact field name as printed on the form",
-      "instruction": "Plain English instruction for this field",
-      "warning": "Optional: common mistake or tricky note, or null"
-    }
-  ],
-  "tips": ["tip 1", "tip 2", "tip 3"],
-  "sample": [
-    {
-      "field": "Exact field name",
-      "value": "Realistic dummy value using Alex Rivera, SSN XXX-XX-1234, 142 Maple Street Austin TX 78701, employer Brightpath Solutions Inc."
-    }
-  ]
-}
-
-If you do not recognise the form name or cannot provide reliable information, return:
-{
-  "found": false,
-  "message": "Brief explanation of why the form wasn't found"
-}
-
-Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation outside the JSON object.`;
 
     /* ─── Shared styles ──────────────────────────────────────────── */
     const S = {
@@ -177,7 +136,7 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
     }
 
     /* ─── Header ─────────────────────────────────────────────────── */
-    function Header({ count, onApiKey }) {
+    function Header({ count }) {
       return (
         <header style={{ background: '#0F1E3C', borderBottom: '1px solid #1e3560' }}>
           <div style={{
@@ -185,7 +144,6 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
             padding: '1rem 1.25rem',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            {/* Logo */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📋</span>
@@ -201,29 +159,13 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
                 Instant form intelligence, powered by AI
               </p>
             </div>
-
-            {/* Right controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-              <p style={{
-                margin: 0, fontFamily: 'Inter, sans-serif',
-                fontSize: '0.75rem', color: '#94a3b8',
-              }}>
-                <span style={{ color: '#F59E0B', fontWeight: 600 }}>{count}</span>
-                {' / '}{MAX_FREE} free lookups used
-              </p>
-              <button
-                onClick={onApiKey}
-                aria-label="Configure Anthropic API key"
-                style={{
-                  background: 'none', border: '1px solid #2e4470',
-                  borderRadius: '5px', padding: '2px 10px',
-                  fontSize: '0.7rem', color: '#94a3b8',
-                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
-                }}
-              >
-                API Key
-              </button>
-            </div>
+            <p style={{
+              margin: 0, fontFamily: 'Inter, sans-serif',
+              fontSize: '0.75rem', color: '#94a3b8',
+            }}>
+              <span style={{ color: '#F59E0B', fontWeight: 600 }}>{count}</span>
+              {' / '}{MAX_FREE} free lookups used
+            </p>
           </div>
         </header>
       );
@@ -374,9 +316,9 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
 
     /* ─── TabBar ─────────────────────────────────────────────────── */
     const TABS = [
-      { id: 'overview',      label: 'Overview' },
-      { id: 'instructions',  label: 'Instructions' },
-      { id: 'sample',        label: 'Filled Sample' },
+      { id: 'overview',     label: 'Overview' },
+      { id: 'instructions', label: 'Instructions' },
+      { id: 'sample',       label: 'Filled Sample' },
     ];
 
     function TabBar({ active, setActive }) {
@@ -452,11 +394,9 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
             <InfoBox label="Issued By">
               <p style={{ ...S.body, margin: 0 }}>{r.issued_by}</p>
             </InfoBox>
-
             <InfoBox label="Purpose">
               <p style={{ ...S.body, margin: 0 }}>{r.purpose}</p>
             </InfoBox>
-
             <InfoBox label="Who Needs It">
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                 {r.who_needs_it.map((item, i) => (
@@ -464,13 +404,11 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
                 ))}
               </ul>
             </InfoBox>
-
             {r.deadline && (
               <InfoBox label="Deadline / When to File">
                 <p style={{ ...S.body, margin: 0 }}>{r.deadline}</p>
               </InfoBox>
             )}
-
             {r.where_to_submit && (
               <InfoBox label="Where to Submit">
                 <p style={{ ...S.body, margin: 0 }}>{r.where_to_submit}</p>
@@ -489,12 +427,8 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
             {r.instructions.map((item, i) => (
               <li
                 key={i}
-                style={{
-                  display: 'flex', gap: '0.875rem', alignItems: 'flex-start',
-                  ...S.infoBox,
-                }}
+                style={{ display: 'flex', gap: '0.875rem', alignItems: 'flex-start', ...S.infoBox }}
               >
-                {/* Step number */}
                 <span style={{
                   flexShrink: 0,
                   width: '26px', height: '26px',
@@ -506,7 +440,6 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
                 }}>
                   {i + 1}
                 </span>
-
                 <div style={{ flex: 1 }}>
                   <p style={{
                     margin: '0 0 0.3rem',
@@ -523,10 +456,8 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
                       margin: '0.5rem 0 0',
                       fontFamily: 'Inter, sans-serif', fontSize: '0.8rem',
                       color: '#92400e', lineHeight: 1.5,
-                      background: '#fffbeb',
-                      border: '1px solid #fde68a',
-                      borderRadius: '5px',
-                      padding: '0.35rem 0.6rem',
+                      background: '#fffbeb', border: '1px solid #fde68a',
+                      borderRadius: '5px', padding: '0.35rem 0.6rem',
                     }}>
                       ⚠️ {item.warning}
                     </p>
@@ -538,11 +469,8 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
 
           {r.tips && r.tips.length > 0 && (
             <div style={{
-              marginTop: '1.25rem',
-              padding: '1rem 1.125rem',
-              background: '#f0fdf4',
-              border: '1.5px solid #bbf7d0',
-              borderRadius: '10px',
+              marginTop: '1.25rem', padding: '1rem 1.125rem',
+              background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px',
             }}>
               <p style={{ ...S.label, margin: '0 0 0.6rem', color: '#15803d' }}>💡 Pro Tips</p>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -565,19 +493,14 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
           aria-labelledby="tab-sample"
           style={{ position: 'relative' }}
         >
-          {/* Diagonal watermark */}
           <div
             aria-hidden="true"
             style={{
-              position: 'absolute',
-              top: '50%', left: '50%',
+              position: 'absolute', top: '50%', left: '50%',
               transform: 'translate(-50%, -50%) rotate(-18deg)',
-              fontFamily: '"DM Serif Display", serif',
-              fontSize: '1.6rem',
-              color: 'rgba(15,30,60,0.07)',
-              letterSpacing: '0.12em',
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
+              fontFamily: '"DM Serif Display", serif', fontSize: '1.6rem',
+              color: 'rgba(15,30,60,0.07)', letterSpacing: '0.12em',
+              pointerEvents: 'none', whiteSpace: 'nowrap',
               zIndex: 0, userSelect: 'none',
             }}
           >
@@ -586,71 +509,48 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
 
           <div style={{
             position: 'relative', zIndex: 1,
-            background: '#fff',
-            border: '2px solid #e2e8f0',
-            borderRadius: '10px',
-            overflow: 'hidden',
+            background: '#fff', border: '2px solid #e2e8f0',
+            borderRadius: '10px', overflow: 'hidden',
           }}>
-            {/* Card header */}
             <div style={{
-              padding: '0.875rem 1.125rem',
-              borderBottom: '1px solid #e2e8f0',
+              padding: '0.875rem 1.125rem', borderBottom: '1px solid #e2e8f0',
               display: 'flex', justifyContent: 'space-between',
               alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem',
               background: '#f8fafc',
             }}>
               <div>
-                <p style={{
-                  margin: 0,
-                  fontFamily: '"DM Serif Display", serif',
-                  fontSize: '0.95rem', color: '#0F1E3C',
-                }}>
+                <p style={{ margin: 0, fontFamily: '"DM Serif Display", serif', fontSize: '0.95rem', color: '#0F1E3C' }}>
                   {r.form_name}
                 </p>
-                <p style={{
-                  margin: '2px 0 0',
-                  fontFamily: 'Inter, sans-serif', fontSize: '0.72rem', color: '#64748b',
-                }}>
+                <p style={{ margin: '2px 0 0', fontFamily: 'Inter, sans-serif', fontSize: '0.72rem', color: '#64748b' }}>
                   Sample completion · Alex Rivera
                 </p>
               </div>
               <span style={{
                 padding: '0.2rem 0.65rem',
-                background: '#fef3c7', border: '1px solid #fde68a',
-                borderRadius: '4px',
-                fontFamily: '"IBM Plex Mono", monospace',
-                fontSize: '0.68rem', color: '#92400e', fontWeight: 500,
+                background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '4px',
+                fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.68rem', color: '#92400e', fontWeight: 500,
               }}>
                 SAMPLE
               </span>
             </div>
 
-            {/* Field rows */}
             <div>
               {r.sample.map((item, i) => (
                 <div
                   key={i}
                   style={{
-                    display: 'flex', gap: '0.75rem',
-                    alignItems: 'flex-start',
+                    display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                     padding: '0.55rem 1.125rem',
                     background: i % 2 === 0 ? '#fff' : '#f8fafc',
                     flexWrap: 'wrap',
                   }}
                 >
-                  <span style={{
-                    fontFamily: '"IBM Plex Mono", monospace',
-                    fontSize: '0.78rem', color: '#64748b',
-                    minWidth: '170px', flexShrink: 0,
-                  }}>
+                  <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.78rem', color: '#64748b', minWidth: '170px', flexShrink: 0 }}>
                     {item.field}
                   </span>
                   <span style={{ fontSize: '0.78rem', color: '#94a3b8', flexShrink: 0 }}>→</span>
-                  <span style={{
-                    fontFamily: '"IBM Plex Mono", monospace',
-                    fontSize: '0.78rem', color: '#0F1E3C', fontWeight: 500,
-                    flex: 1,
-                  }}>
+                  <span style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.78rem', color: '#0F1E3C', fontWeight: 500, flex: 1 }}>
                     {item.value}
                   </span>
                 </div>
@@ -658,10 +558,7 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
             </div>
           </div>
 
-          <p style={{
-            marginTop: '0.6rem', textAlign: 'center',
-            fontFamily: 'Inter, sans-serif', fontSize: '0.72rem', color: '#94a3b8',
-          }}>
+          <p style={{ marginTop: '0.6rem', textAlign: 'center', fontFamily: 'Inter, sans-serif', fontSize: '0.72rem', color: '#94a3b8' }}>
             Fictional data only. Do not use on an actual form.
           </p>
         </section>
@@ -686,21 +583,17 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
         <footer style={{
           maxWidth: '720px', margin: '2rem auto 0',
           padding: '1.25rem 1.25rem 2rem',
-          borderTop: '1px solid #e2e8f0',
-          textAlign: 'center',
+          borderTop: '1px solid #e2e8f0', textAlign: 'center',
         }}>
-          <p style={{
-            margin: 0,
-            fontFamily: 'Inter, sans-serif', fontSize: '0.73rem', color: '#9ca3af', lineHeight: 1.65,
-          }}>
+          <p style={{ margin: 0, fontFamily: 'Inter, sans-serif', fontSize: '0.73rem', color: '#9ca3af', lineHeight: 1.65 }}>
             FormIQ provides AI-generated guidance for informational purposes only. Always verify form instructions with the issuing agency. Not legal or tax advice.
           </p>
         </footer>
       );
     }
 
-    /* ─── Modals ─────────────────────────────────────────────────── */
-    function Backdrop({ onClose, children }) {
+    /* ─── PaywallModal ───────────────────────────────────────────── */
+    function PaywallModal({ onClose }) {
       return (
         <div
           role="dialog"
@@ -714,10 +607,10 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
           }}
         >
           <div style={{
-            background: '#fff', borderRadius: '14px',
-            padding: '2rem', maxWidth: '460px', width: '100%',
+            background: '#fff', borderRadius: '14px', padding: '2rem',
+            maxWidth: '460px', width: '100%',
             boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-            position: 'relative',
+            position: 'relative', textAlign: 'center',
           }}>
             <button
               onClick={onClose}
@@ -727,51 +620,27 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
                 background: 'none', border: 'none',
                 fontSize: '1.4rem', color: '#9ca3af', cursor: 'pointer', lineHeight: 1,
               }}
-            >
-              ×
-            </button>
-            {children}
-          </div>
-        </div>
-      );
-    }
+            >×</button>
 
-    function PaywallModal({ onClose }) {
-      return (
-        <Backdrop onClose={onClose}>
-          <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
-            <h2 style={{
-              fontFamily: '"DM Serif Display", serif',
-              fontSize: '1.45rem', color: '#0F1E3C',
-              margin: '0 0 0.6rem',
-            }}>
+            <h2 style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.45rem', color: '#0F1E3C', margin: '0 0 0.6rem' }}>
               You've used your 5 free lookups
             </h2>
             <p style={{ ...S.body, margin: '0 0 1.25rem', color: '#64748b' }}>
               Upgrade to FormIQ Pro for unlimited access, PDF export, form history, and team sharing.
             </p>
-            <div style={{
-              background: '#f8fafc', borderRadius: '10px',
-              padding: '1rem', marginBottom: '1.25rem',
-              border: '1px solid #e2e8f0',
-            }}>
-              <p style={{
-                fontFamily: '"DM Serif Display", serif',
-                fontSize: '1.85rem', color: '#0F1E3C', margin: '0 0 0.15rem',
-              }}>$29/month</p>
+            <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
+              <p style={{ fontFamily: '"DM Serif Display", serif', fontSize: '1.85rem', color: '#0F1E3C', margin: '0 0 0.15rem' }}>$29/month</p>
               <p style={{ margin: 0, fontFamily: 'Inter, sans-serif', fontSize: '0.78rem', color: '#94a3b8' }}>Cancel anytime · No commitment</p>
             </div>
             <button
               onClick={onClose}
               aria-label="Upgrade to Pro"
               style={{
-                display: 'block', width: '100%',
-                padding: '0.85rem',
+                display: 'block', width: '100%', padding: '0.85rem',
                 background: '#F59E0B', color: '#0F1E3C',
                 border: 'none', borderRadius: '8px',
-                fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: '0.95rem',
-                cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
               }}
             >
               Upgrade to Pro →
@@ -781,72 +650,18 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
               style={{
                 marginTop: '0.65rem', display: 'block', width: '100%',
                 background: 'none', border: 'none',
-                fontFamily: 'Inter, sans-serif', fontSize: '0.8rem', color: '#94a3b8',
-                cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif', fontSize: '0.8rem', color: '#94a3b8', cursor: 'pointer',
               }}
             >
               Maybe later
             </button>
           </div>
-        </Backdrop>
-      );
-    }
-
-    function ApiKeyModal({ onClose, onSave }) {
-      const [localKey, setLocalKey] = useState('');
-      const handleSave = () => { if (localKey.trim()) onSave(localKey.trim()); };
-      return (
-        <Backdrop onClose={onClose}>
-          <h2 style={{
-            fontFamily: '"DM Serif Display", serif',
-            fontSize: '1.25rem', color: '#0F1E3C', margin: '0 0 0.5rem',
-          }}>
-            Enter your Anthropic API Key
-          </h2>
-          <p style={{ ...S.body, fontSize: '0.82rem', color: '#64748b', margin: '0 0 1rem' }}>
-            Your key stays in-memory for this session only and is never stored or sent anywhere except directly to the Anthropic API.
-          </p>
-          <input
-            type="password"
-            autoFocus
-            value={localKey}
-            onChange={e => setLocalKey(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-            placeholder="sk-ant-api03-…"
-            aria-label="Anthropic API key"
-            style={{
-              display: 'block', width: '100%',
-              padding: '0.75rem',
-              fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.85rem',
-              border: '1.5px solid #d1d5db', borderRadius: '8px',
-              marginBottom: '0.875rem', outline: 'none', color: '#0F1E3C',
-            }}
-            onFocus={e => (e.target.style.borderColor = '#F59E0B')}
-            onBlur={e  => (e.target.style.borderColor = '#d1d5db')}
-          />
-          <button
-            onClick={handleSave}
-            disabled={!localKey.trim()}
-            aria-label="Save API key and continue"
-            style={{
-              display: 'block', width: '100%',
-              padding: '0.8rem',
-              background: localKey.trim() ? '#0F1E3C' : '#94a3b8',
-              color: '#FAFAF8', border: 'none', borderRadius: '8px',
-              fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '0.95rem',
-              cursor: localKey.trim() ? 'pointer' : 'not-allowed',
-            }}
-          >
-            Save &amp; Continue
-          </button>
-        </Backdrop>
+        </div>
       );
     }
 
     /* ─── App ────────────────────────────────────────────────────── */
     function App() {
-      const apiKeyRef = useRef('');
-
       const [query,     setQuery]     = useState('');
       const [loading,   setLoading]   = useState(false);
       const [result,    setResult]    = useState(null);
@@ -854,58 +669,25 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
       const [activeTab, setActiveTab] = useState('overview');
       const [history,   setHistory]   = useState([]);
       const [count,     setCount]     = useState(0);
+      const [showPaywall, setShowPaywall] = useState(false);
 
-      const [showPaywall,  setShowPaywall]  = useState(false);
-      const [showApiModal, setShowApiModal] = useState(false);
-      const [pendingForm,  setPendingForm]  = useState(null);
-
-      const lookup = useCallback(async (formName, keyOverride) => {
-        const key = keyOverride || apiKeyRef.current;
-
-        if (!key) {
-          setPendingForm(formName);
-          setShowApiModal(true);
-          return;
-        }
-
-        setCount(prev => {
-          if (prev >= MAX_FREE) {
-            setShowPaywall(true);
-            return prev;
-          }
-          return prev;
-        });
-
-        // Read current count synchronously via ref trick
-        if (count >= MAX_FREE) {
-          setShowPaywall(true);
-          return;
-        }
+      const lookup = useCallback(async (formName) => {
+        if (count >= MAX_FREE) { setShowPaywall(true); return; }
 
         setLoading(true);
         setError(null);
         setResult(null);
 
         try {
-          const res = await fetch('https://api.anthropic.com/v1/messages', {
+          const res = await fetch('/api/lookup', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': key,
-              'anthropic-version': '2023-06-01',
-              'anthropic-dangerous-request-header': 'true',
-            },
-            body: JSON.stringify({
-              model: MODEL,
-              max_tokens: 4096,
-              system: SYSTEM_PROMPT,
-              messages: [{ role: 'user', content: `Form name: ${formName}` }],
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ formName }),
           });
 
           if (!res.ok) {
             const errBody = await res.json().catch(() => ({}));
-            throw new Error(errBody?.error?.message || `API error ${res.status}`);
+            throw new Error(errBody?.error || `Server error ${res.status}`);
           }
 
           const data = await res.json();
@@ -918,7 +700,7 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
 
           setCount(prev => {
             const next = prev + 1;
-            if (next >= MAX_FREE) setTimeout(() => setShowPaywall(true), 300);
+            if (next >= MAX_FREE) setTimeout(() => setShowPaywall(true), 400);
             return next;
           });
 
@@ -949,21 +731,9 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
         lookup(query.trim());
       };
 
-      const handleApiSave = key => {
-        apiKeyRef.current = key;
-        setShowApiModal(false);
-        if (pendingForm) {
-          lookup(pendingForm, key);
-          setPendingForm(null);
-        }
-      };
-
       return (
         <div style={{ background: '#FAFAF8', minHeight: '100vh' }}>
-          <Header
-            count={count}
-            onApiKey={() => setShowApiModal(true)}
-          />
+          <Header count={count} />
 
           <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2rem 1.25rem 1rem' }}>
             <SearchBar
@@ -979,9 +749,9 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
             />
 
             <div aria-live="polite" aria-atomic="false">
-              {loading                   && <LoadingState formName={query} />}
-              {!loading && error         && <ErrorState   message={error} />}
-              {!loading && result        && (
+              {loading            && <LoadingState formName={query} />}
+              {!loading && error  && <ErrorState   message={error} />}
+              {!loading && result && (
                 <ResultsPanel
                   result={result}
                   activeTab={activeTab}
@@ -992,14 +762,7 @@ Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation o
           </main>
 
           <Footer />
-
-          {showPaywall  && <PaywallModal onClose={() => setShowPaywall(false)} />}
-          {showApiModal && (
-            <ApiKeyModal
-              onClose={() => { setShowApiModal(false); setPendingForm(null); }}
-              onSave={handleApiSave}
-            />
-          )}
+          {showPaywall && <PaywallModal onClose={() => setShowPaywall(false)} />}
         </div>
       );
     }
