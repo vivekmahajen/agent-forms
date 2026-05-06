@@ -1,7 +1,7 @@
-import { kv } from '@vercel/kv';
-import crypto from 'crypto';
+const { kv } = require('@vercel/kv');
+const crypto = require('crypto');
 
-export function parseCookies(req) {
+function parseCookies(req) {
   const list = {};
   const header = req.headers.cookie || '';
   header.split(';').forEach(c => {
@@ -12,38 +12,38 @@ export function parseCookies(req) {
   return list;
 }
 
-export function getSessionToken(req) {
+function getSessionToken(req) {
   return parseCookies(req).formiq_session;
 }
 
-export function hashPassword(password, salt) {
+function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
 
-export function createSalt() {
+function createSalt() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-export function createToken() {
+function createToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-export function isTrialExpired(user) {
+function isTrialExpired(user) {
   if (user.plan !== 'free') return false;
   const expiry = new Date(user.registeredAt).getTime() + 7 * 24 * 60 * 60 * 1000;
   return Date.now() > expiry;
 }
 
-export function getTrialDaysLeft(user) {
+function getTrialDaysLeft(user) {
   const expiry = new Date(user.registeredAt).getTime() + 7 * 24 * 60 * 60 * 1000;
   return Math.max(0, Math.ceil((expiry - Date.now()) / (24 * 60 * 60 * 1000)));
 }
 
-export function getTodayKey() {
+function getTodayKey() {
   return new Date().toISOString().split('T')[0];
 }
 
-export async function getAuthUser(req) {
+async function getAuthUser(req) {
   const token = getSessionToken(req);
   if (!token) return null;
   const email = await kv.get(`session:${token}`);
@@ -51,5 +51,19 @@ export async function getAuthUser(req) {
   return kv.get(`user:${email}`);
 }
 
-export const SESSION_TTL = 7 * 24 * 60 * 60; // seconds
-export const DAILY_LIMIT = 10;
+const SESSION_TTL = 7 * 24 * 60 * 60;
+const DAILY_LIMIT = 10;
+
+module.exports = {
+  parseCookies,
+  getSessionToken,
+  hashPassword,
+  createSalt,
+  createToken,
+  isTrialExpired,
+  getTrialDaysLeft,
+  getTodayKey,
+  getAuthUser,
+  SESSION_TTL,
+  DAILY_LIMIT,
+};

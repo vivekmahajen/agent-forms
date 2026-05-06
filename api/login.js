@@ -1,7 +1,7 @@
-import { kv } from '@vercel/kv';
-import { hashPassword, createToken, SESSION_TTL } from './_utils.js';
+const { kv } = require('@vercel/kv');
+const { hashPassword, createToken, SESSION_TTL } = require('./_utils');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { email, password } = req.body || {};
@@ -22,4 +22,4 @@ export default async function handler(req, res) {
 
   res.setHeader('Set-Cookie', `formiq_session=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL}`);
   return res.status(200).json({ success: true, plan: user.plan });
-}
+};

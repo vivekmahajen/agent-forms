@@ -1,5 +1,5 @@
-import { kv } from '@vercel/kv';
-import { getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } from './_utils.js';
+const { kv } = require('@vercel/kv');
+const { getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
 
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
 
@@ -38,10 +38,9 @@ If you do not recognise the form name or cannot provide reliable information, re
 
 Return ONLY valid JSON. No markdown, no backticks, no preamble, no explanation outside the JSON object.`;
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Auth
   const token = getSessionToken(req);
   if (!token) return res.status(401).json({ error: 'auth_required' });
 
@@ -51,7 +50,6 @@ export default async function handler(req, res) {
   const user = await kv.get(`user:${email}`);
   if (!user) return res.status(401).json({ error: 'user_not_found' });
 
-  // Free plan restrictions
   if (user.plan === 'free') {
     if (isTrialExpired(user)) {
       return res.status(403).json({
@@ -67,11 +65,10 @@ export default async function handler(req, res) {
     if (dailyCount >= DAILY_LIMIT) {
       return res.status(429).json({
         error: 'daily_limit',
-        message: `You've used all ${DAILY_LIMIT} lookups for today. Come back tomorrow, or upgrade to Pro for unlimited access.`,
+        message: `You've used all ${DAILY_LIMIT} lookups for today. Come back tomorrow or upgrade to Pro.`,
       });
     }
 
-    // 25h TTL so it always resets by next day regardless of timezone
     await kv.set(usageKey, dailyCount + 1, { ex: 25 * 60 * 60 });
   }
 
@@ -109,4 +106,4 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
-}
+};

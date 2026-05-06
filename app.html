@@ -442,11 +442,12 @@
     useEffect(() => {
       fetch('/api/me')
         .then(r => {
-          if (r.status === 401) { window.location.href = '/'; return null; }
+          if (!r.ok) { window.location.href = '/'; return null; }
           return r.json();
         })
         .then(data => {
           if (!data) return;
+          if (data.error) { window.location.href = '/'; return; }
           setUser(data);
           if (data.trialExpired) setUpgrade('trial_expired');
           setAuthReady(true);

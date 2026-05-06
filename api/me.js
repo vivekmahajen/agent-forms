@@ -1,7 +1,7 @@
-import { kv } from '@vercel/kv';
-import { getSessionToken, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } from './_utils.js';
+const { kv } = require('@vercel/kv');
+const { getSessionToken, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } = require('./_utils');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const token = getSessionToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
@@ -25,4 +25,4 @@ export default async function handler(req, res) {
     dailyCount,
     dailyLimit: user.plan === 'free' ? DAILY_LIMIT : null,
   });
-}
+};
