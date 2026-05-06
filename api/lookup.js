@@ -14,6 +14,7 @@ When given a form name, you return a structured JSON object with EXACTLY this sh
   "who_needs_it": ["bullet 1", "bullet 2", "bullet 3"],
   "deadline": "When it must be filed, or null if not applicable",
   "where_to_submit": "Where to send or submit it, or null if not applicable",
+  "official_pdf_url": "Direct https:// URL to download the blank official PDF form (e.g. https://www.irs.gov/pub/irs-pdf/f1040.pdf). Must be a direct PDF download link, not an HTML page. Return null if the form is online-only, employer-generated, or you are not certain of the exact URL.",
   "instructions": [
     {
       "field": "Exact field name as printed on the form",
