@@ -1,5 +1,5 @@
-const { kv } = require('@vercel/kv');
-const { getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const { createKV, getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const kv = createKV();
 
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
 

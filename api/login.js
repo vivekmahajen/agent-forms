@@ -1,5 +1,5 @@
-const { kv } = require('@vercel/kv');
-const { hashPassword, createToken, SESSION_TTL } = require('./_utils');
+const { createKV, hashPassword, createToken, SESSION_TTL } = require('./_utils');
+const kv = createKV();
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();

@@ -1,5 +1,12 @@
-const { kv } = require('@vercel/kv');
+const { Redis } = require('@upstash/redis');
 const crypto = require('crypto');
+
+function createKV() {
+  return new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
 
 function parseCookies(req) {
   const list = {};
@@ -55,6 +62,7 @@ const SESSION_TTL = 7 * 24 * 60 * 60;
 const DAILY_LIMIT = 10;
 
 module.exports = {
+  createKV,
   parseCookies,
   getSessionToken,
   hashPassword,

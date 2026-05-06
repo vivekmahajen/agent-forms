@@ -1,5 +1,5 @@
-const { kv } = require('@vercel/kv');
-const { getSessionToken, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const { createKV, getSessionToken, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const kv = createKV();
 
 module.exports = async function handler(req, res) {
   const token = getSessionToken(req);
