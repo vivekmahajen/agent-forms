@@ -205,18 +205,27 @@ module.exports = async function handler(req, res) {
   const urlHash = crypto.createHash('md5').update(resolvedUrl).digest('hex');
   const cacheKey = `pdf_mapping:${urlHash}`;
 
-  // If the caller passed a chat conversation, extract field values from it first
+  // If the caller passed a chat conversation, extract field values from it first.
+  // Skip the Redis cache entirely — cached mappings embed sample values and must
+  // not be reused for a real user's data.
   let resolvedFields = fields;
-  if (Array.isArray(chatHistory) && chatHistory.length && Array.isArray(fieldList) && fieldList.length) {
+  const usingChatData = Array.isArray(chatHistory) && chatHistory.length && Array.isArray(fieldList) && fieldList.length;
+  if (usingChatData) {
     try {
       resolvedFields = await extractFieldsFromChat(chatHistory, fieldList, apiKey);
+      if (!Array.isArray(resolvedFields) || resolvedFields.length === 0) {
+        resolvedFields = fields; // fall back to caller-supplied fields (sample data)
+      }
     } catch (_) {
-      resolvedFields = fields; // fall back to sample data
+      resolvedFields = fields;
     }
   }
 
   let mapping = null;
-  try { mapping = await kv.get(cacheKey); } catch {}
+  // Only read from cache when not using chat data (cache stores sample values)
+  if (!usingChatData) {
+    try { mapping = await kv.get(cacheKey); } catch {}
+  }
 
   if (!mapping && Array.isArray(resolvedFields) && resolvedFields.length > 0) {
     const sortedFields = getSortedFields(form, pdfDoc);
@@ -227,12 +236,11 @@ module.exports = async function handler(req, res) {
 
     try {
       mapping = await getAiMapping(fieldInfo, resolvedFields, apiKey);
-      // Only cache when using sample data — user-specific answers must not be cached
-      if (!chatHistory) {
+      // Only cache sample-data mappings (field name structure, not user values)
+      if (!usingChatData) {
         await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
       }
     } catch (err) {
-      // AI mapping failed — fall back to best-effort fuzzy matching
       mapping = null;
     }
   }

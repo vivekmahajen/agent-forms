@@ -655,17 +655,19 @@
 
   /* ── Build fill-form payload (sample data or chat-extracted answers) ── */
   function buildFillPayload() {
-    var base = { formName: currentResult.form_name, pdfUrl: currentResult.official_pdf_url };
+    var base = {
+      formName: currentResult.form_name,
+      pdfUrl:   currentResult.official_pdf_url,
+      fields:   currentResult.sample,   // always included as fallback
+    };
     if (window.FiqChat && window.FiqChat.isGuideMode()) {
       var chatHistory = window.FiqChat.getHistory();
       if (chatHistory.length > 2) {
-        return Object.assign(base, {
-          chatHistory: chatHistory,
-          fieldList:   currentResult.instructions,
-        });
+        base.chatHistory = chatHistory;
+        base.fieldList   = currentResult.instructions;
       }
     }
-    return Object.assign(base, { fields: currentResult.sample });
+    return base;
   }
 
   /* ── Download pre-filled PDF ─────────────────────────────────── */
