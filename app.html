@@ -99,6 +99,42 @@
     .sample-value { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #0F1E3C; font-weight: 500; flex: 1; }
     .sample-note { margin-top: 0.6rem; text-align: center; font-size: 0.72rem; color: #94a3b8; }
 
+    /* ── Context section (key facts, penalties, etc.) ───────────── */
+    .context-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+    .context-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.875rem 1rem; }
+    .context-box.warn { background: #fff8f0; border-color: #fcd9a0; }
+    .context-box.green { background: #f0fdf4; border-color: #bbf7d0; }
+    .ctx-label { font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 0.4rem; }
+    .ctx-label.warn-label { color: #92400e; }
+    .ctx-label.green-label { color: #15803d; }
+    .ctx-body { font-size: 0.875rem; color: #334155; line-height: 1.6; margin: 0; }
+    .ctx-list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+    .ctx-list li { font-size: 0.875rem; color: #334155; line-height: 1.55; }
+    .useful-links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+    .useful-link { font-size: 0.78rem; color: #1d4ed8; text-decoration: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 5px; padding: 0.2rem 0.6rem; }
+    .useful-link:hover { background: #dbeafe; }
+
+    /* ── Related forms card ─────────────────────────────────────── */
+    .related-card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 1.5rem; margin-top: 1.25rem; }
+    .related-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .related-title { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: #0F1E3C; margin: 0; }
+    .related-subtitle { font-size: 0.78rem; color: #94a3b8; margin: 0; }
+    .related-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .related-table th { padding: 0.5rem 0.75rem; text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; border-bottom: 1.5px solid #e2e8f0; white-space: nowrap; }
+    .related-table td { padding: 0.75rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .related-table tr:last-child td { border-bottom: none; }
+    .related-table tr:hover td { background: #f8fafc; }
+    .btn-form-link { background: none; border: 1.5px solid #0F1E3C; border-radius: 6px; padding: 0.25rem 0.7rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; font-weight: 500; color: #0F1E3C; cursor: pointer; white-space: nowrap; }
+    .btn-form-link:hover { background: #0F1E3C; color: #FAFAF8; }
+    .rel-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 600; white-space: nowrap; }
+    .rel-required   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .rel-together   { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .rel-may        { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .rel-prereq     { background: #fdf4ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .rel-followup   { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .rel-alt        { background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; }
+    .rel-reason     { font-size: 0.8rem; color: #64748b; line-height: 1.5; margin: 0; }
+
     /* ── Download / preview bar ─────────────────────────────────── */
     .dl-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; padding: 0.875rem 1rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; }
     .dl-bar-text { font-size: 0.82rem; color: #166534; flex: 1; line-height: 1.45; }
@@ -383,7 +419,8 @@
         '<div id="panel-overview"  class="tab-panel active">' + renderOverview(r)     + '</div>' +
         '<div id="panel-instructions" class="tab-panel">'     + renderInstructions(r) + '</div>' +
         '<div id="panel-sample"    class="tab-panel">'        + renderSample(r)       + '</div>' +
-      '</div>';
+      '</div>' +
+      renderRelatedForms(r);
     statusArea.innerHTML = html;
 
     // Wire up tab buttons
@@ -400,9 +437,19 @@
     // Wire up fill-form buttons
     var fillBtn = document.getElementById('btn-fill-form');
     if (fillBtn) fillBtn.addEventListener('click', function() { downloadFilledForm(); });
-
     var previewBtn = document.getElementById('btn-preview-form');
     if (previewBtn) previewBtn.addEventListener('click', function() { previewFilledForm(); });
+
+    // Wire up related-form lookup buttons
+    statusArea.querySelectorAll('.btn-form-link').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var name = btn.dataset.form;
+        if (!name) return;
+        searchInput.value = name;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        doLookup(name);
+      });
+    });
   }
 
   function renderTabBar() {
@@ -426,11 +473,92 @@
     var submit = r.where_to_submit
       ? '<div class="info-box"><p class="info-label">Where to Submit</p><p class="info-body">' + escHtml(r.where_to_submit) + '</p></div>' : '';
 
+    var ctx = r.context || {};
+
+    // Key facts
+    var keyFacts = '';
+    if (ctx.key_facts && ctx.key_facts.length) {
+      var factItems = ctx.key_facts.map(function(f) {
+        return '<li>' + escHtml(f) + '</li>';
+      }).join('');
+      keyFacts = '<div class="context-box green"><p class="ctx-label green-label">💡 Key Facts</p><ul class="ctx-list">' + factItems + '</ul></div>';
+    }
+
+    // Penalties
+    var penalties = ctx.penalties
+      ? '<div class="context-box warn"><p class="ctx-label warn-label">⚠️ Penalties & Consequences</p><p class="ctx-body">' + escHtml(ctx.penalties) + '</p></div>' : '';
+
+    // Recent changes
+    var changes = ctx.recent_changes
+      ? '<div class="context-box"><p class="ctx-label">🔄 Recent Changes</p><p class="ctx-body">' + escHtml(ctx.recent_changes) + '</p></div>' : '';
+
+    // Who qualifies
+    var qualifies = ctx.who_qualifies
+      ? '<div class="context-box"><p class="ctx-label">✅ Who Qualifies / Eligibility</p><p class="ctx-body">' + escHtml(ctx.who_qualifies) + '</p></div>' : '';
+
+    // Useful links
+    var links = '';
+    if (ctx.useful_links && ctx.useful_links.length) {
+      var linkHtml = ctx.useful_links.map(function(l) {
+        return '<a href="' + escAttr(l.url) + '" target="_blank" rel="noopener" class="useful-link">' + escHtml(l.label) + ' ↗</a>';
+      }).join('');
+      links = '<div class="info-box" style="margin-top:0.75rem;"><p class="info-label">Official Resources</p><div class="useful-links">' + linkHtml + '</div></div>';
+    }
+
+    var contextSection = (keyFacts || penalties || changes || qualifies)
+      ? '<div class="context-grid">' + keyFacts + penalties + changes + qualifies + '</div>' : '';
+
     return '<h2 class="form-title">' + escHtml(r.form_name) + '</h2>' + alias +
       '<div class="info-box"><p class="info-label">Issued By</p><p class="info-body">' + escHtml(r.issued_by) + '</p></div>' +
       '<div class="info-box"><p class="info-label">Purpose</p><p class="info-body">' + escHtml(r.purpose) + '</p></div>' +
       '<div class="info-box"><p class="info-label">Who Needs It</p><ul style="margin:0;padding-left:1.25rem;">' + bullets + '</ul></div>' +
-      deadline + submit;
+      deadline + submit +
+      contextSection +
+      links;
+  }
+
+  /* ── Related forms card ──────────────────────────────────────── */
+  function relBadgeClass(rel) {
+    if (!rel) return 'rel-alt';
+    var r = rel.toLowerCase();
+    if (r.includes('required')) return 'rel-required';
+    if (r.includes('together')) return 'rel-together';
+    if (r.includes('prerequisite')) return 'rel-prereq';
+    if (r.includes('follow')) return 'rel-followup';
+    if (r.includes('alternative')) return 'rel-alt';
+    return 'rel-may';
+  }
+
+  function renderRelatedForms(r) {
+    if (!r.related_forms || !r.related_forms.length) return '';
+
+    var rows = r.related_forms.map(function(f) {
+      var badge = '<span class="rel-badge ' + relBadgeClass(f.relationship) + '">' + escHtml(f.relationship || 'Related') + '</span>';
+      return '<tr>' +
+        '<td><button class="btn-form-link" data-form="' + escAttr(f.form_name) + '">' + escHtml(f.form_name) + '</button></td>' +
+        '<td style="color:#374151;">' + escHtml(f.full_name || '') + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td><p class="rel-reason">' + escHtml(f.reason || '') + '</p></td>' +
+      '</tr>';
+    }).join('');
+
+    return '<div class="related-card fade-in">' +
+      '<div class="related-header">' +
+        '<div>' +
+          '<h3 class="related-title">📋 Related Forms</h3>' +
+          '<p class="related-subtitle">Other forms you may need to file alongside ' + escHtml(r.form_name) + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div style="overflow-x:auto;">' +
+        '<table class="related-table">' +
+          '<thead><tr>' +
+            '<th>Form</th><th>Full Name</th><th>Relationship</th><th>When You Need It</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<p style="margin:0.75rem 0 0;font-size:0.72rem;color:#94a3b8;">Click any form name to look it up instantly.</p>' +
+    '</div>';
   }
 
   function renderInstructions(r) {

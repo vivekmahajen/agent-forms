@@ -16,6 +16,29 @@ When given a form name, return a structured JSON object with EXACTLY this shape:
   "deadline": "When it must be filed, or null if not applicable",
   "where_to_submit": "Where to send or submit it, or null if not applicable",
   "official_pdf_url": "Direct https:// URL to download the blank official PDF form. Must be a direct PDF download link, not an HTML page. Return null if the form is online-only, employer-generated, or you are not certain of the exact URL.",
+  "related_forms": [
+    Include 3-6 forms that are directly associated with this form — forms that must be filed together,
+    are commonly needed alongside it, are prerequisites, or are follow-up forms.
+    Order by relevance (most essential first).
+    {
+      "form_name": "Short identifier as commonly used (e.g. 'Schedule C', 'Form W-2', 'I-94')",
+      "full_name": "Official full name of the related form",
+      "relationship": "One of exactly: Required with | Often filed together | May be required | Prerequisite | Follow-up form | Alternative",
+      "reason": "1-2 sentences explaining exactly when and why someone filling the main form would also need this one"
+    }
+  ],
+  "context": {
+    "key_facts": ["3-5 critical facts every filer must know — deadlines, thresholds, eligibility rules, special cases"],
+    "penalties": "What penalties, fines, or consequences apply for errors, late filing, or non-filing. Be specific with amounts where known. Or null.",
+    "recent_changes": "Any notable changes, updates, or new requirements in the last 2 years. Or null if no significant changes.",
+    "who_qualifies": "Any income limits, eligibility criteria, or exceptions that determine who must or must not file this form. Or null.",
+    "useful_links": [
+      {
+        "label": "Short descriptive label (e.g. 'Official Instructions', 'IRS Publication 15')",
+        "url": "https://... (must be a real, stable government or official URL)"
+      }
+    ]
+  },
   "instructions": [
     CRITICAL: Include an entry for EVERY SINGLE field printed on the form — no exceptions.
     This includes: all numbered boxes, checkboxes, signature lines, date fields, part headers
