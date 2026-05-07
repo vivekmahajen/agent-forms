@@ -232,8 +232,8 @@
       <p class="modal-sub">Sign in to your FormIQ account</p>
       <div class="form-error" id="login-error"></div>
       <form id="login-form" onsubmit="submitLogin(event)">
-        <label class="field-label" for="login-email">Email address</label>
-        <input class="field-input" id="login-email" type="email" placeholder="you@example.com" required />
+        <label class="field-label" for="login-email">Email or username</label>
+        <input class="field-input" id="login-email" type="text" placeholder="you@example.com or admin" required autocomplete="username" />
         <label class="field-label" for="login-password">Password</label>
         <input class="field-input" id="login-password" type="password" placeholder="Your password" required />
         <button class="btn-submit" id="login-submit" type="submit">Sign In</button>
