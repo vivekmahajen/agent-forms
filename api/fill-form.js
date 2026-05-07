@@ -1,6 +1,7 @@
 const { createKV, getSessionToken } = require('./_utils');
 const { lookupPdfUrl } = require('./_form-urls');
 const { PDFDocument } = require('pdf-lib');
+const crypto = require('crypto');
 const kv = createKV();
 
 const ALLOWED_DOMAINS = [
@@ -18,39 +19,71 @@ function isAllowedUrl(raw) {
   } catch { return false; }
 }
 
-// ── Field-name matching ────────────────────────────────────────────────────
+// Sort fields top-to-bottom, left-to-right by their visual position on the page
+function getSortedFields(form, pdfDoc) {
+  const pages = pdfDoc.getPages();
+  const pageRefMap = new Map();
+  pages.forEach((page, i) => pageRefMap.set(page.ref, i));
 
-function norm(s) {
-  return String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-// Tokenise a field name into meaningful words
-function tokens(s) {
-  return String(s)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')     // camelCase split
-    .replace(/[_\-./[\]()]/g, ' ')            // punctuation → space
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(t => t.length > 1);
-}
-
-function score(aiName, pdfName) {
-  const an = norm(aiName), pn = norm(pdfName);
-  if (an === pn) return 100;
-  if (pn.includes(an) || an.includes(pn)) return 80;
-  const at = tokens(aiName), pt = tokens(pdfName);
-  const shared = at.filter(t => pt.includes(t)).length;
-  if (shared === 0) return 0;
-  return Math.round(60 * shared / Math.max(at.length, pt.length));
-}
-
-function bestMatch(aiName, pdfNames) {
-  let best = null, bestScore = 30; // minimum threshold
-  for (const p of pdfNames) {
-    const s = score(aiName, p);
-    if (s > bestScore) { best = p; bestScore = s; }
+  const withPos = [];
+  for (const field of form.getFields()) {
+    try {
+      const widgets = field.acroField.getWidgets();
+      if (!widgets.length) { withPos.push({ field, page: 0, y: 0, x: 0 }); continue; }
+      const w = widgets[0];
+      const rect = w.getRectangle();
+      const pageRef = w.P();
+      const pageIdx = pageRef ? (pageRefMap.get(pageRef) ?? 0) : 0;
+      withPos.push({ field, page: pageIdx, y: rect.y, x: rect.x });
+    } catch {
+      withPos.push({ field, page: 0, y: 0, x: 0 });
+    }
   }
-  return best;
+
+  withPos.sort((a, b) => {
+    if (a.page !== b.page) return a.page - b.page;
+    if (Math.abs(a.y - b.y) > 4) return b.y - a.y; // higher y = earlier on page in PDF coords
+    return a.x - b.x;
+  });
+
+  return withPos.map(fp => fp.field);
+}
+
+// Ask Claude Haiku to map sample data → exact PDF field names
+async function getAiMapping(fieldInfo, sampleData, apiKey) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      system: `You map human-readable form field labels to PDF internal field names.
+Return ONLY a valid JSON array — no markdown, no explanation.
+Each element: {"fieldName": "<exact PDF field name>", "value": "<value to fill>"}
+For checkboxes and radio buttons use value "check" if it should be selected, omit otherwise.
+Skip fields you are not confident about.`,
+      messages: [{
+        role: 'user',
+        content: `PDF fields (sorted top-to-bottom as they appear on the form):
+${JSON.stringify(fieldInfo)}
+
+Human-readable sample data to fill in:
+${JSON.stringify(sampleData)}
+
+Map the sample values to the correct PDF field names.`,
+      }],
+    }),
+  });
+
+  if (!res.ok) throw new Error('AI mapping call failed: ' + res.status);
+  const data = await res.json();
+  const text = ((data.content || []).find(b => b.type === 'text') || {}).text || '[]';
+  const clean = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+  return JSON.parse(clean);
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────
@@ -82,6 +115,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Only official government PDF URLs are supported.' });
   }
 
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Server not configured' });
+
   // ── Fetch PDF ────────────────────────────────────────────────
   let pdfBytes;
   try {
@@ -91,7 +127,7 @@ module.exports = async function handler(req, res) {
     });
     if (!upstream.ok) {
       return res.status(502).json({
-        error: `Could not download the official form (HTTP ${upstream.status}). The government may have moved the file.`,
+        error: `Could not download the official form (HTTP ${upstream.status}).`,
         fallback_url: resolvedUrl,
       });
     }
@@ -100,7 +136,7 @@ module.exports = async function handler(req, res) {
     return res.status(502).json({ error: 'Network error fetching form: ' + err.message });
   }
 
-  // ── Load & inspect PDF ───────────────────────────────────────
+  // ── Load PDF ─────────────────────────────────────────────────
   let pdfDoc;
   try {
     pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -111,58 +147,86 @@ module.exports = async function handler(req, res) {
   const form = pdfDoc.getForm();
   const pdfFields = form.getFields();
 
-  // Detect XFA (xml-based) forms — pdf-lib cannot fill these
-  const isXfa = pdfFields.length === 0 && pdfBytes.includes
-    && (function() {
-      const chunk = Buffer.from(pdfBytes).slice(0, 8192).toString('binary');
-      return chunk.includes('/XFA') || chunk.includes('xdp:xdp');
-    })();
-
   if (pdfFields.length === 0) {
+    const buf = Buffer.from(pdfBytes);
+    const isXfa = buf.slice(0, 8192).includes('/XFA') || buf.slice(0, 8192).includes('xdp:xdp');
     const msg = isXfa
-      ? 'This PDF uses the XFA format, which cannot be filled programmatically. Download the blank form and fill it manually in Adobe Acrobat or Adobe Reader.'
+      ? 'This PDF uses the XFA format (Adobe Acrobat only). Download the blank form and fill it manually in Adobe Acrobat or Adobe Reader.'
       : 'This PDF has no fillable fields. Download the blank form and fill it manually.';
     return res.status(422).json({ error: msg, fallback_url: resolvedUrl });
   }
 
+  // ── Get or build field mapping ───────────────────────────────
+  const urlHash = crypto.createHash('md5').update(resolvedUrl).digest('hex');
+  const cacheKey = `pdf_mapping:${urlHash}`;
+
+  let mapping = null;
+  try { mapping = await kv.get(cacheKey); } catch {}
+
+  if (!mapping && Array.isArray(fields) && fields.length > 0) {
+    const sortedFields = getSortedFields(form, pdfDoc);
+    const fieldInfo = sortedFields.map(f => ({
+      name: f.getName(),
+      type: f.constructor.name.replace('PDF', ''),
+    }));
+
+    try {
+      mapping = await getAiMapping(fieldInfo, fields, apiKey);
+      // Cache for 7 days — field names don't change between form revisions often
+      await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
+    } catch (err) {
+      // AI mapping failed — fall back to best-effort fuzzy matching
+      mapping = null;
+    }
+  }
+
   // ── Fill fields ──────────────────────────────────────────────
   let filled = 0;
-  const pdfFieldNames = pdfFields.map(f => f.getName());
 
-  if (Array.isArray(fields) && fields.length > 0) {
-    for (const { field, value } of fields) {
-      if (!field || value == null) continue;
-      const match = bestMatch(field, pdfFieldNames);
-      if (!match) continue;
+  if (Array.isArray(mapping) && mapping.length > 0) {
+    // Use AI mapping
+    for (const { fieldName, value } of mapping) {
+      if (!fieldName || value == null) continue;
       try {
-        const pf = form.getField(match);
-        const type = pf.constructor.name;
+        const field = form.getField(fieldName);
+        const type = field.constructor.name;
         const val = String(value);
 
         if (type === 'PDFTextField') {
-          pf.setText(val);
+          field.setText(val);
           filled++;
         } else if (type === 'PDFCheckBox') {
-          const v = val.toLowerCase();
-          if (v === 'yes' || v === 'true' || v === 'x' || v === '1' || v === 'checked') {
-            pf.check(); filled++;
+          if (val === 'check' || val.toLowerCase() === 'yes' || val === 'x' || val === '1') {
+            field.check(); filled++;
           }
         } else if (type === 'PDFDropdown' || type === 'PDFOptionList') {
-          const opts = pf.getOptions();
+          const opts = field.getOptions();
           const pick = opts.find(o => o.toLowerCase().includes(val.toLowerCase()))
                     || opts.find(o => val.toLowerCase().includes(o.toLowerCase()));
-          if (pick) { pf.select(pick); filled++; }
+          if (pick) { field.select(pick); filled++; }
         } else if (type === 'PDFRadioGroup') {
-          const opts = pf.getOptions();
+          const opts = field.getOptions();
           const pick = opts.find(o => o.toLowerCase().includes(val.toLowerCase()));
-          if (pick) { pf.select(pick); filled++; }
+          if (pick) { field.select(pick); filled++; }
         }
-      } catch (_) { /* read-only or incompatible field — skip silently */ }
+      } catch { /* skip read-only or missing fields */ }
+    }
+  } else if (Array.isArray(fields) && fields.length > 0) {
+    // Fuzzy fallback (covers cases where AI mapping errored)
+    const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const pdfNames = pdfFields.map(f => f.getName());
+    for (const { field: aiName, value } of fields) {
+      const match = pdfNames.find(n => norm(n) === norm(aiName))
+                 || pdfNames.find(n => norm(n).includes(norm(aiName)) || norm(aiName).includes(norm(n)));
+      if (!match) continue;
+      try {
+        const f = form.getField(match);
+        if (f.constructor.name === 'PDFTextField') { f.setText(String(value)); filled++; }
+      } catch {}
     }
   }
 
   const out = await pdfDoc.save();
-
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="filled-form.pdf"');
   res.setHeader('X-Fields-Filled', String(filled));
