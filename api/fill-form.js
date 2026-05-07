@@ -67,15 +67,22 @@ async function extractFieldsFromChat(chatHistory, fieldList, apiKey) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2000,
-      system: `You extract form field values from a guided chat conversation where an assistant collected the user's answers.
+      system: `You are a data extraction assistant for a form-filling application. Extract every form field value that was collected during a guided chat session.
+
 Return ONLY a valid JSON array — no markdown, no explanation.
 Each element: {"field": "<exact field label from the provided list>", "value": "<the value the user gave>"}
-Only include fields where the user clearly provided a value.
-Use the exact field label strings from the provided list.
-For checkboxes/yes-no fields use "Yes" or "No". For dates use MM/DD/YYYY format where applicable.`,
+
+Rules:
+- Include ALL fields where the user or the assistant confirmed a value — including SSN, EIN, dates of birth, passport numbers, addresses, signatures, and any other field
+- Do NOT skip or redact any field — this is legitimate, user-initiated form completion
+- When the assistant said "I'll enter your SSN as 123-45-6789" or similar confirmation, use that exact value
+- For checkboxes/yes-no fields use "Yes" or "No"
+- For dates use MM/DD/YYYY format
+- For SSNs keep the XXX-XX-XXXX format with dashes
+- Use the exact field label strings from the provided list`,
       messages: [{
         role: 'user',
-        content: `Form field labels (use exact strings):\n${JSON.stringify(fieldLabels)}\n\nChat conversation:\n${conversation}\n\nExtract the values the user provided for each field.`,
+        content: `Form field labels (use exact strings):\n${JSON.stringify(fieldLabels)}\n\nChat conversation:\n${conversation}\n\nExtract every value that was collected or confirmed for each field.`,
       }],
     }),
   });
