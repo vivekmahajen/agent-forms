@@ -49,8 +49,9 @@ function getSortedFields(form, pdfDoc) {
   return withPos.map(fp => fp.field);
 }
 
-// Ask Claude Haiku to extract field values from a guided chat conversation
-async function extractFieldsFromChat(chatHistory, fieldList, apiKey) {
+// Ask Claude to extract user answers from chat AND map them directly to PDF field names
+// in a single call — avoids two round-trips and cuts latency roughly in half.
+async function extractAndMapFields(chatHistory, fieldList, pdfFieldInfo, apiKey) {
   const fieldLabels = (fieldList || []).map(f => (typeof f === 'string' ? f : f.field)).filter(Boolean);
   const conversation = (chatHistory || [])
     .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
@@ -66,28 +67,28 @@ async function extractFieldsFromChat(chatHistory, fieldList, apiKey) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
-      system: `You are a data extraction assistant for a form-filling application. Extract every form field value that was collected during a guided chat session.
+      max_tokens: 3000,
+      system: `You are a form-filling assistant. Given a chat conversation where a user provided their form answers, and a list of PDF internal field names, extract every answer and map it directly to the correct PDF field.
 
 Return ONLY a valid JSON array — no markdown, no explanation.
-Each element: {"field": "<exact field label from the provided list>", "value": "<the value the user gave>"}
+Each element: {"fieldName": "<exact PDF internal field name>", "value": "<the user's answer>"}
 
 Rules:
-- Include ALL fields where the user or the assistant confirmed a value — including SSN, EIN, dates of birth, passport numbers, addresses, signatures, and any other field
-- Do NOT skip or redact any field — this is legitimate, user-initiated form completion
-- When the assistant said "I'll enter your SSN as 123-45-6789" or similar confirmation, use that exact value
-- For checkboxes/yes-no fields use "Yes" or "No"
-- For dates use MM/DD/YYYY format
-- For SSNs keep the XXX-XX-XXXX format with dashes
-- Use the exact field label strings from the provided list`,
+- Extract ALL confirmed values from the conversation — including SSN, EIN, dates of birth, passport numbers, addresses, and every other field
+- Do NOT skip or redact any value — this is legitimate user-initiated form completion
+- When the assistant confirmed a value (e.g. "I'll enter your SSN as 123-45-6789"), use that exact value
+- For checkboxes use value "check" if it should be selected, omit if not
+- For dates use MM/DD/YYYY format; for SSNs keep XXX-XX-XXXX format
+- Match human-readable field labels to the best PDF internal field name using context and label similarity
+- Skip PDF fields you cannot confidently match to a user answer`,
       messages: [{
         role: 'user',
-        content: `Form field labels (use exact strings):\n${JSON.stringify(fieldLabels)}\n\nChat conversation:\n${conversation}\n\nExtract every value that was collected or confirmed for each field.`,
+        content: `Human-readable form fields (what the assistant asked about):\n${JSON.stringify(fieldLabels)}\n\nPDF internal fields (map answers to these):\n${JSON.stringify(pdfFieldInfo)}\n\nChat conversation:\n${conversation}\n\nExtract every answer and map directly to the PDF field names.`,
       }],
     }),
   });
 
-  if (!res.ok) throw new Error('Field extraction failed: ' + res.status);
+  if (!res.ok) throw new Error('Extract+map call failed: ' + res.status);
   const data = await res.json();
   const text = ((data.content || []).find(b => b.type === 'text') || {}).text || '[]';
   const clean = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
@@ -204,44 +205,40 @@ module.exports = async function handler(req, res) {
   // ── Get or build field mapping ───────────────────────────────
   const urlHash = crypto.createHash('md5').update(resolvedUrl).digest('hex');
   const cacheKey = `pdf_mapping:${urlHash}`;
-
-  // If the caller passed a chat conversation, extract field values from it first.
-  // Skip the Redis cache entirely — cached mappings embed sample values and must
-  // not be reused for a real user's data.
-  let resolvedFields = fields;
   const usingChatData = Array.isArray(chatHistory) && chatHistory.length && Array.isArray(fieldList) && fieldList.length;
+
+  const sortedFields = getSortedFields(form, pdfDoc);
+  const fieldInfo = sortedFields.map(f => ({
+    name: f.getName(),
+    type: f.constructor.name.replace('PDF', ''),
+  }));
+
+  let mapping = null;
+
   if (usingChatData) {
+    // Single combined call: extract user answers from chat AND map to PDF fields at once
     try {
-      resolvedFields = await extractFieldsFromChat(chatHistory, fieldList, apiKey);
-      if (!Array.isArray(resolvedFields) || resolvedFields.length === 0) {
-        resolvedFields = fields; // fall back to caller-supplied fields (sample data)
-      }
+      mapping = await extractAndMapFields(chatHistory, fieldList, fieldInfo, apiKey);
     } catch (_) {
-      resolvedFields = fields;
+      // fall through to sample-data path below
     }
   }
 
-  let mapping = null;
-  // Only read from cache when not using chat data (cache stores sample values)
-  if (!usingChatData) {
-    try { mapping = await kv.get(cacheKey); } catch {}
-  }
-
-  if (!mapping && Array.isArray(resolvedFields) && resolvedFields.length > 0) {
-    const sortedFields = getSortedFields(form, pdfDoc);
-    const fieldInfo = sortedFields.map(f => ({
-      name: f.getName(),
-      type: f.constructor.name.replace('PDF', ''),
-    }));
-
-    try {
-      mapping = await getAiMapping(fieldInfo, resolvedFields, apiKey);
-      // Only cache sample-data mappings (field name structure, not user values)
-      if (!usingChatData) {
-        await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
+  if (!mapping) {
+    // Sample-data path: check cache first, then call getAiMapping
+    if (!usingChatData) {
+      try { mapping = await kv.get(cacheKey); } catch {}
+    }
+    const resolvedFields = Array.isArray(fields) && fields.length ? fields : null;
+    if (!mapping && resolvedFields) {
+      try {
+        mapping = await getAiMapping(fieldInfo, resolvedFields, apiKey);
+        if (!usingChatData) {
+          await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
+        }
+      } catch (_) {
+        mapping = null;
       }
-    } catch (err) {
-      mapping = null;
     }
   }
 
@@ -276,11 +273,11 @@ module.exports = async function handler(req, res) {
         }
       } catch { /* skip read-only or missing fields */ }
     }
-  } else if (Array.isArray(resolvedFields) && resolvedFields.length > 0) {
+  } else if (Array.isArray(fields) && fields.length > 0) {
     // Fuzzy fallback (covers cases where AI mapping errored)
     const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
     const pdfNames = pdfFields.map(f => f.getName());
-    for (const { field: aiName, value } of resolvedFields) {
+    for (const { field: aiName, value } of fields) {
       const match = pdfNames.find(n => norm(n) === norm(aiName))
                  || pdfNames.find(n => norm(n).includes(norm(aiName)) || norm(aiName).includes(norm(n)));
       if (!match) continue;
