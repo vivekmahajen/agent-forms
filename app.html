@@ -648,6 +648,21 @@
       '<p class="sample-note">Fictional data only. Do not use on an actual form.</p>';
   }
 
+  /* ── Build fill-form payload (sample data or chat-extracted answers) ── */
+  function buildFillPayload() {
+    var base = { formName: currentResult.form_name, pdfUrl: currentResult.official_pdf_url };
+    if (window.FiqChat && window.FiqChat.isGuideMode()) {
+      var chatHistory = window.FiqChat.getHistory();
+      if (chatHistory.length > 2) {
+        return Object.assign(base, {
+          chatHistory: chatHistory,
+          fieldList:   currentResult.instructions,
+        });
+      }
+    }
+    return Object.assign(base, { fields: currentResult.sample });
+  }
+
   /* ── Download pre-filled PDF ─────────────────────────────────── */
   function downloadFilledForm() {
     if (!currentResult) return;
@@ -660,11 +675,7 @@
     fetch('/api/fill-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        formName: currentResult.form_name,
-        pdfUrl:   currentResult.official_pdf_url,
-        fields:   currentResult.sample,
-      }),
+      body: JSON.stringify(buildFillPayload()),
     })
     .then(function(res) {
       fillRes = res;
@@ -743,11 +754,7 @@
     fetch('/api/fill-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        formName: currentResult.form_name,
-        pdfUrl:   currentResult.official_pdf_url,
-        fields:   currentResult.sample,
-      }),
+      body: JSON.stringify(buildFillPayload()),
     })
     .then(function(res) {
       if (!res.ok) {

@@ -49,6 +49,44 @@ function getSortedFields(form, pdfDoc) {
   return withPos.map(fp => fp.field);
 }
 
+// Ask Claude Haiku to extract field values from a guided chat conversation
+async function extractFieldsFromChat(chatHistory, fieldList, apiKey) {
+  const fieldLabels = (fieldList || []).map(f => (typeof f === 'string' ? f : f.field)).filter(Boolean);
+  const conversation = (chatHistory || [])
+    .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n\n');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      system: `You extract form field values from a guided chat conversation where an assistant collected the user's answers.
+Return ONLY a valid JSON array — no markdown, no explanation.
+Each element: {"field": "<exact field label from the provided list>", "value": "<the value the user gave>"}
+Only include fields where the user clearly provided a value.
+Use the exact field label strings from the provided list.
+For checkboxes/yes-no fields use "Yes" or "No". For dates use MM/DD/YYYY format where applicable.`,
+      messages: [{
+        role: 'user',
+        content: `Form field labels (use exact strings):\n${JSON.stringify(fieldLabels)}\n\nChat conversation:\n${conversation}\n\nExtract the values the user provided for each field.`,
+      }],
+    }),
+  });
+
+  if (!res.ok) throw new Error('Field extraction failed: ' + res.status);
+  const data = await res.json();
+  const text = ((data.content || []).find(b => b.type === 'text') || {}).text || '[]';
+  const clean = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+  return JSON.parse(clean);
+}
+
 // Ask Claude Haiku to map sample data → exact PDF field names
 async function getAiMapping(fieldInfo, sampleData, apiKey) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -97,7 +135,7 @@ module.exports = async function handler(req, res) {
   const email = await kv.get(`session:${token}`);
   if (!email) return res.status(401).json({ error: 'session_expired' });
 
-  const { pdfUrl, formName, fields } = req.body || {};
+  const { pdfUrl, formName, fields, chatHistory, fieldList } = req.body || {};
 
   // Resolve URL: curated map > caller-supplied > error
   let resolvedUrl = null;
@@ -160,10 +198,20 @@ module.exports = async function handler(req, res) {
   const urlHash = crypto.createHash('md5').update(resolvedUrl).digest('hex');
   const cacheKey = `pdf_mapping:${urlHash}`;
 
+  // If the caller passed a chat conversation, extract field values from it first
+  let resolvedFields = fields;
+  if (Array.isArray(chatHistory) && chatHistory.length && Array.isArray(fieldList) && fieldList.length) {
+    try {
+      resolvedFields = await extractFieldsFromChat(chatHistory, fieldList, apiKey);
+    } catch (_) {
+      resolvedFields = fields; // fall back to sample data
+    }
+  }
+
   let mapping = null;
   try { mapping = await kv.get(cacheKey); } catch {}
 
-  if (!mapping && Array.isArray(fields) && fields.length > 0) {
+  if (!mapping && Array.isArray(resolvedFields) && resolvedFields.length > 0) {
     const sortedFields = getSortedFields(form, pdfDoc);
     const fieldInfo = sortedFields.map(f => ({
       name: f.getName(),
@@ -171,9 +219,11 @@ module.exports = async function handler(req, res) {
     }));
 
     try {
-      mapping = await getAiMapping(fieldInfo, fields, apiKey);
-      // Cache for 7 days — field names don't change between form revisions often
-      await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
+      mapping = await getAiMapping(fieldInfo, resolvedFields, apiKey);
+      // Only cache when using sample data — user-specific answers must not be cached
+      if (!chatHistory) {
+        await kv.set(cacheKey, mapping, { ex: 7 * 24 * 60 * 60 });
+      }
     } catch (err) {
       // AI mapping failed — fall back to best-effort fuzzy matching
       mapping = null;
@@ -211,11 +261,11 @@ module.exports = async function handler(req, res) {
         }
       } catch { /* skip read-only or missing fields */ }
     }
-  } else if (Array.isArray(fields) && fields.length > 0) {
+  } else if (Array.isArray(resolvedFields) && resolvedFields.length > 0) {
     // Fuzzy fallback (covers cases where AI mapping errored)
     const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
     const pdfNames = pdfFields.map(f => f.getName());
-    for (const { field: aiName, value } of fields) {
+    for (const { field: aiName, value } of resolvedFields) {
       const match = pdfNames.find(n => norm(n) === norm(aiName))
                  || pdfNames.find(n => norm(n).includes(norm(aiName)) || norm(aiName).includes(norm(n)));
       if (!match) continue;

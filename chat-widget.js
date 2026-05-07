@@ -391,5 +391,9 @@
       if (nameEl) nameEl.textContent = 'FormIQ Assistant';
       if (statusEl) statusEl.textContent = 'Online · Powered by Claude';
     },
+
+    isGuideMode: function () { return activeFormContext !== null; },
+    getHistory:  function () { return history.slice(); },
+    getFormContext: function () { return activeFormContext; },
   };
 })();
