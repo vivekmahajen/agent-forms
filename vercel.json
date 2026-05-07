@@ -2,6 +2,11 @@
   "version": 2,
   "buildCommand": "",
   "outputDirectory": ".",
+  "functions": {
+    "api/fill-form.js": { "maxDuration": 60 },
+    "api/lookup.js":    { "maxDuration": 60 },
+    "api/chat.js":      { "maxDuration": 30 }
+  },
   "rewrites": [
     { "source": "/app",   "destination": "/app.html" },
     { "source": "/admin", "destination": "/admin.html" }

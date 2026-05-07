@@ -664,7 +664,8 @@
       var chatHistory = window.FiqChat.getHistory();
       if (chatHistory.length > 2) {
         base.chatHistory = chatHistory;
-        base.fieldList   = currentResult.instructions;
+        // Send only field names — instruction text is large and unneeded for extraction
+        base.fieldList = currentResult.instructions.map(function(f) { return f.field; });
       }
     }
     return base;

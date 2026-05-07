@@ -219,15 +219,24 @@
   var downloadCallback = null;
 
   dlBtn.addEventListener('click', function () {
-    if (typeof downloadCallback === 'function') {
-      dlBtn.disabled = true;
-      dlBtn.textContent = '⏳ Building PDF…';
-      downloadCallback(function (ok) {
-        dlBtn.disabled = false;
-        dlBtn.textContent = ok ? '✅ Downloaded!' : '📥 Download filled PDF';
-        if (ok) setTimeout(function () { dlBtn.textContent = '📥 Download filled PDF'; }, 3000);
-      });
-    }
+    if (typeof downloadCallback !== 'function') return;
+    dlBtn.disabled = true;
+    dlBtn.textContent = '⏳ Building PDF…';
+    document.getElementById('fiq-dl-bar-text').textContent = 'Extracting your answers and filling the form…';
+    downloadCallback(function (ok) {
+      dlBtn.disabled = false;
+      if (ok) {
+        dlBtn.textContent = '✅ Downloaded!';
+        document.getElementById('fiq-dl-bar-text').textContent = 'Your filled PDF has been downloaded.';
+        setTimeout(function () {
+          dlBtn.textContent = '📥 Download filled PDF';
+          document.getElementById('fiq-dl-bar-text').textContent = 'Ready to download your filled PDF?';
+        }, 4000);
+      } else {
+        dlBtn.textContent = '📥 Try again';
+        document.getElementById('fiq-dl-bar-text').textContent = '⚠️ Download failed — check your connection and try again.';
+      }
+    });
   });
 
   // ── Suggestions ──────────────────────────────────────────────────
