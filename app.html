@@ -468,29 +468,37 @@
 
   /* ── Download pre-filled PDF ─────────────────────────────────── */
   function downloadFilledForm() {
-    if (!currentResult || !currentResult.official_pdf_url) return;
+    if (!currentResult) return;
     var btn = document.getElementById('btn-fill-form');
     if (!btn) return;
     btn.disabled = true;
     btn.textContent = '⏳ Preparing…';
 
+    var fillRes;
     fetch('/api/fill-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pdfUrl: currentResult.official_pdf_url,
-        fields: currentResult.sample,
+        formName: currentResult.form_name,
+        pdfUrl:   currentResult.official_pdf_url,
+        fields:   currentResult.sample,
       }),
     })
     .then(function(res) {
+      fillRes = res;
       if (!res.ok) {
         return res.json().catch(function() { return {}; }).then(function(d) {
-          throw new Error(d.error || 'Server error ' + res.status);
+          var err = new Error(d.error || 'Server error ' + res.status);
+          err.fallbackUrl = d.fallback_url || currentResult.official_pdf_url;
+          throw err;
         });
       }
       return res.blob();
     })
     .then(function(blob) {
+      var filled = parseInt(fillRes.headers.get('X-Fields-Filled') || '0', 10);
+      var total  = parseInt(fillRes.headers.get('X-Fields-Total')  || '0', 10);
+
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
@@ -499,21 +507,34 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
       btn.disabled = false;
-      btn.textContent = '✓ Downloaded';
-      setTimeout(function() { btn.textContent = '⬇ Download Pre-filled'; }, 3000);
+      var label = filled > 0
+        ? '✓ Downloaded (' + filled + '/' + total + ' fields filled)'
+        : '✓ Downloaded';
+      btn.textContent = label;
+      setTimeout(function() { if (btn) btn.textContent = '⬇ Download Pre-filled'; }, 4000);
     })
     .catch(function(err) {
       btn.disabled = false;
       btn.textContent = '⬇ Download Pre-filled';
-      // Show inline error above the table
-      var dlBar = btn.closest('.dl-bar');
+      var dlBar = btn.closest ? btn.closest('.dl-bar') : null;
       if (dlBar) {
-        var errEl = document.createElement('p');
-        errEl.style.cssText = 'margin:0.5rem 0 0;font-size:0.8rem;color:#b91c1c;width:100%;';
-        errEl.textContent = '⚠️ ' + err.message;
+        // Remove any previous error
+        var prev = dlBar.querySelector('.dl-err');
+        if (prev) prev.parentNode.removeChild(prev);
+
+        var errEl = document.createElement('div');
+        errEl.className = 'dl-err';
+        errEl.style.cssText = 'margin-top:0.6rem;font-size:0.8rem;color:#b91c1c;width:100%;line-height:1.5;';
+        var msg = '⚠️ ' + err.message;
+        if (err.fallbackUrl) {
+          msg += ' — <a href="' + escAttr(err.fallbackUrl) + '" target="_blank" rel="noopener" style="color:#1d4ed8;">Download blank form instead</a>';
+          errEl.innerHTML = msg;
+        } else {
+          errEl.textContent = msg;
+        }
         dlBar.appendChild(errEl);
-        setTimeout(function() { if (errEl.parentNode) errEl.parentNode.removeChild(errEl); }, 6000);
       }
     });
   }
