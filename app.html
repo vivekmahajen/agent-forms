@@ -143,6 +143,7 @@
     .btn-preview { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #F59E0B; color: #0F1E3C; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
     .btn-preview:disabled { background: #94a3b8; color: #fff; cursor: not-allowed; }
     .btn-blank   { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; background: #fff; color: #0F1E3C; border: 1.5px solid #0F1E3C; border-radius: 7px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; }
+    .btn-guide   { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #7c3aed; color: #fff; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
     .no-pdf-note { font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem; font-style: italic; }
 
     /* ── Inline PDF viewer ──────────────────────────────────────── */
@@ -440,6 +441,14 @@
     var previewBtn = document.getElementById('btn-preview-form');
     if (previewBtn) previewBtn.addEventListener('click', function() { previewFilledForm(); });
 
+    // Wire up guided session button
+    var guideBtn = document.getElementById('btn-guide-form');
+    if (guideBtn) guideBtn.addEventListener('click', function() {
+      if (window.FiqChat && currentResult && Array.isArray(currentResult.instructions)) {
+        window.FiqChat.startGuide(currentResult.form_name, currentResult.instructions);
+      }
+    });
+
     // Wire up related-form lookup buttons
     statusArea.querySelectorAll('.btn-form-link').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -593,18 +602,24 @@
       '</div>';
     }).join('');
 
+    var guideBtn = '<button class="btn-guide" id="btn-guide-form">🤖 Guide me through this</button>';
     var dlBar = '';
     if (r.official_pdf_url) {
       dlBar =
         '<div class="dl-bar">' +
           '<span class="dl-bar-text">📄 Official PDF found — preview or download the form pre-filled with sample data.</span>' +
+          guideBtn +
           '<a href="' + escAttr(r.official_pdf_url) + '" target="_blank" rel="noopener" class="btn-blank">Blank PDF</a>' +
           '<button class="btn-preview" id="btn-preview-form">👁 Preview Filled</button>' +
           '<button class="btn-fill" id="btn-fill-form">⬇ Download</button>' +
         '</div>' +
         '<div id="pdf-viewer-wrap" style="display:none;"></div>';
     } else {
-      dlBar = '<p class="no-pdf-note">No official downloadable PDF for this form (submitted online or employer-generated).</p>';
+      dlBar =
+        '<div class="dl-bar" style="background:#f5f3ff;border-color:#ddd6fe;">' +
+          '<span class="dl-bar-text" style="color:#5b21b6;">This form is submitted online or employer-generated — no downloadable PDF.</span>' +
+          guideBtn +
+        '</div>';
     }
 
     return dlBar +

@@ -1,7 +1,7 @@
 const { createKV, getSessionToken } = require('./_utils');
 const kv = createKV();
 
-const SYSTEM_PROMPT = `You are FormIQ Assistant — a friendly, expert support agent for FormIQ, a service that helps people understand and complete official forms.
+const BASE_SYSTEM_PROMPT = `You are FormIQ Assistant — a friendly, expert support agent for FormIQ, a service that helps people understand and complete official forms.
 
 You have deep expertise in:
 • US Tax forms: W-2, W-4, W-9, 1040 (and Schedules A–E), SS-4, 4506-T, 1099 series, 8962, and more
@@ -25,10 +25,46 @@ Tone & style:
 • Never make up URLs — only cite official gov domains (irs.gov, uscis.gov, ssa.gov, etc.)
 • If uncertain, say so clearly rather than guessing`;
 
+function buildSystemPrompt(formContext) {
+  if (!formContext || !formContext.formName || !Array.isArray(formContext.fields) || !formContext.fields.length) {
+    return BASE_SYSTEM_PROMPT;
+  }
+
+  const fieldList = formContext.fields
+    .map((f, i) => {
+      let line = `${i + 1}. **${f.field}**`;
+      if (f.instruction) line += `\n   How to fill: ${f.instruction}`;
+      if (f.warning) line += `\n   ⚠ Common mistake: ${f.warning}`;
+      return line;
+    })
+    .join('\n');
+
+  return BASE_SYSTEM_PROMPT + `
+
+---
+
+## ACTIVE GUIDED SESSION — ${formContext.formName}
+
+The user has clicked "Guide me through this" for **${formContext.formName}**. You now act as their personal form-filling coach. Follow these rules for the entire conversation:
+
+### Your behaviour
+1. **Greet** the user warmly and confirm you will walk them through ${formContext.formName} step by step.
+2. **One section at a time** — introduce each logical section (e.g. "Part 1 — Personal Information"), then ask 1–2 questions per message. Never dump all fields at once.
+3. **Explain the WHY** before each question in plain English (e.g. "This field sets your tax filing deadline — a wrong date can trigger a penalty").
+4. **Accept natural language** and silently convert to the required format (e.g. "March of last year" → "03/${new Date().getFullYear() - 1}"; "I'm single" → check "Single" box).
+5. **Progress recap** after every 3–4 fields: "So far: Name ✓, SSN ✓, Address ✓. Next: employment status."
+6. **Final summary** — once all fields are covered, show every answer neatly formatted and ask the user to confirm before saying the form is complete.
+7. **Reassure** — if the user seems confused or anxious, normalise it: "This trips up a lot of people — here's the simple version."
+8. **Never use legal jargon** without immediately explaining it in parentheses.
+
+### Form fields to guide through (in order)
+${fieldList}`;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { messages, guestId } = req.body || {};
+  const { messages, guestId, formContext } = req.body || {};
   if (!Array.isArray(messages) || !messages.length) {
     return res.status(400).json({ error: 'messages array is required' });
   }
@@ -74,7 +110,7 @@ module.exports = async function handler(req, res) {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         stream: true,
-        system: SYSTEM_PROMPT,
+        system: buildSystemPrompt(formContext),
         messages: sanitized,
       }),
     });

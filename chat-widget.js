@@ -11,8 +11,9 @@
     } catch { return 'anon'; }
   })();
 
-  // ── Conversation history ─────────────────────────────────────────
+  // ── Conversation history & form context ─────────────────────────
   var history = [];
+  var activeFormContext = null;
 
   // ── Inject CSS ───────────────────────────────────────────────────
   var style = document.createElement('style');
@@ -304,7 +305,7 @@
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: history, guestId: guestId }),
+      body: JSON.stringify({ messages: history, guestId: guestId, formContext: activeFormContext }),
     })
     .then(function (res) {
       if (!res.ok) {
@@ -358,4 +359,37 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+
+  // ── Public API ───────────────────────────────────────────────────
+  window.FiqChat = {
+    open: open,
+
+    // Start a guided form-filling session from the app page
+    startGuide: function (formName, fields) {
+      // Reset state
+      activeFormContext = { formName: formName, fields: fields };
+      history = [];
+      messagesEl.innerHTML = '';
+      suggestionsEl.style.display = 'none';
+
+      // Update header to show guide mode
+      var nameEl = document.getElementById('fiq-header-name');
+      var statusEl = document.getElementById('fiq-status-text');
+      if (nameEl) nameEl.textContent = 'FormIQ Guide — ' + formName;
+      if (statusEl) statusEl.textContent = 'Step-by-step mode · Powered by Claude';
+
+      open();
+      // Trigger Claude to start the guided session
+      sendMessage('Please guide me through filling out ' + formName + ', one section at a time.');
+    },
+
+    // Reset to normal chat mode (called if user navigates away)
+    resetGuide: function () {
+      activeFormContext = null;
+      var nameEl = document.getElementById('fiq-header-name');
+      var statusEl = document.getElementById('fiq-status-text');
+      if (nameEl) nameEl.textContent = 'FormIQ Assistant';
+      if (statusEl) statusEl.textContent = 'Online · Powered by Claude';
+    },
+  };
 })();
