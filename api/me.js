@@ -1,4 +1,4 @@
-const { createKV, getSessionToken, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const { createKV, getSessionToken, isAdmin, isTrialExpired, getTrialDaysLeft, getTodayKey, DAILY_LIMIT } = require('./_utils');
 const kv = createKV();
 
 module.exports = async function handler(req, res) {
@@ -10,6 +10,18 @@ module.exports = async function handler(req, res) {
 
   const user = await kv.get(`user:${email}`);
   if (!user) return res.status(401).json({ error: 'User not found' });
+
+  if (isAdmin(user)) {
+    return res.status(200).json({
+      email: user.email,
+      plan: 'admin',
+      registeredAt: user.registeredAt,
+      trialExpired: false,
+      daysLeft: null,
+      dailyCount: 0,
+      dailyLimit: null,
+    });
+  }
 
   const today = getTodayKey();
   const dailyCount = (await kv.get(`usage:${email}:${today}`)) || 0;

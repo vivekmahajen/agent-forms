@@ -1,4 +1,4 @@
-const { createKV, getSessionToken, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
+const { createKV, getSessionToken, isAdmin, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
 const { lookupPdfUrl } = require('./_form-urls');
 const kv = createKV();
 
@@ -73,26 +73,28 @@ module.exports = async function handler(req, res) {
   const user = await kv.get(`user:${email}`);
   if (!user) return res.status(401).json({ error: 'user_not_found' });
 
-  if (user.plan === 'free') {
-    if (isTrialExpired(user)) {
-      return res.status(403).json({
-        error: 'trial_expired',
-        message: 'Your 7-day free trial has ended. Upgrade to Pro to continue.',
-      });
+  if (!isAdmin(user)) {
+    if (user.plan === 'free') {
+      if (isTrialExpired(user)) {
+        return res.status(403).json({
+          error: 'trial_expired',
+          message: 'Your 7-day free trial has ended. Upgrade to Pro to continue.',
+        });
+      }
+
+      const today = getTodayKey();
+      const usageKey = `usage:${email}:${today}`;
+      const dailyCount = (await kv.get(usageKey)) || 0;
+
+      if (dailyCount >= DAILY_LIMIT) {
+        return res.status(429).json({
+          error: 'daily_limit',
+          message: `You've used all ${DAILY_LIMIT} lookups for today. Come back tomorrow or upgrade to Pro.`,
+        });
+      }
+
+      await kv.set(usageKey, dailyCount + 1, { ex: 25 * 60 * 60 });
     }
-
-    const today = getTodayKey();
-    const usageKey = `usage:${email}:${today}`;
-    const dailyCount = (await kv.get(usageKey)) || 0;
-
-    if (dailyCount >= DAILY_LIMIT) {
-      return res.status(429).json({
-        error: 'daily_limit',
-        message: `You've used all ${DAILY_LIMIT} lookups for today. Come back tomorrow or upgrade to Pro.`,
-      });
-    }
-
-    await kv.set(usageKey, dailyCount + 1, { ex: 25 * 60 * 60 });
   }
 
   const { formName } = req.body || {};
@@ -132,7 +134,6 @@ module.exports = async function handler(req, res) {
       if (textBlock) {
         const parsed = JSON.parse(textBlock.text);
         if (parsed.found) {
-          // Try the user's query first, then the canonical form name Claude returned
           const curated = lookupPdfUrl(formName) ?? lookupPdfUrl(parsed.form_name);
           if (typeof curated !== 'undefined') {
             parsed.official_pdf_url = curated;
@@ -140,7 +141,14 @@ module.exports = async function handler(req, res) {
           }
         }
       }
-    } catch (_) { /* non-critical — leave Claude's original response unchanged */ }
+    } catch (_) { /* non-critical */ }
+
+    // Log lookup for admin reporting (fire-and-forget, non-blocking)
+    const logEntry = JSON.stringify({ email, formName, ts: new Date().toISOString() });
+    Promise.all([
+      kv.lpush('lookups:recent', logEntry).then(() => kv.ltrim('lookups:recent', 0, 999)),
+      kv.hincrby('forms:count', formName.toLowerCase().trim(), 1),
+    ]).catch(() => {});
 
     return res.status(200).json(data);
   } catch (err) {

@@ -25,13 +25,17 @@ module.exports = async function handler(req, res) {
   }
 
   const salt = createSalt();
+  const now = Date.now();
   await kv.set(userKey, {
     email: normalizedEmail,
     passwordHash: hashPassword(password, salt),
     salt,
-    registeredAt: new Date().toISOString(),
+    registeredAt: new Date(now).toISOString(),
     plan: 'free',
   });
+
+  // Track user in sorted set for admin reporting (score = signup timestamp)
+  await kv.zadd('users:index', { score: now, member: normalizedEmail });
 
   const token = createToken();
   await kv.set(`session:${token}`, normalizedEmail, { ex: SESSION_TTL });

@@ -253,6 +253,18 @@
     var count  = currentUser.dailyCount || 0;
     var limit  = currentUser.dailyLimit;
 
+    if (plan === 'admin') {
+      var adminLink = document.getElementById('admin-nav-link');
+      if (!adminLink) {
+        var a = document.createElement('a');
+        a.id = 'admin-nav-link';
+        a.href = '/admin';
+        a.textContent = 'Admin ↗';
+        a.style.cssText = 'font-size:0.72rem;color:#F59E0B;font-weight:600;text-decoration:none;margin-right:0.5rem;';
+        btnSignout.parentNode.insertBefore(a, btnSignout);
+      }
+    }
+
     var metaHtml = '';
     if (plan === 'free' && !exp) {
       var dayColor = (days <= 1) ? '#f87171' : '#94a3b8';

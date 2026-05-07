@@ -35,6 +35,10 @@ function createToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function isAdmin(user) {
+  return user && user.plan === 'admin';
+}
+
 function isTrialExpired(user) {
   if (user.plan !== 'free') return false;
   const expiry = new Date(user.registeredAt).getTime() + 7 * 24 * 60 * 60 * 1000;
@@ -68,6 +72,7 @@ module.exports = {
   hashPassword,
   createSalt,
   createToken,
+  isAdmin,
   isTrialExpired,
   getTrialDaysLeft,
   getTodayKey,

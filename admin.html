@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FormIQ Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; min-height: 100vh; }
+
+    /* ── Spinner ─────────────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid #1e293b; border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.75s linear infinite; }
+    #auth-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    #app { display: none; }
+
+    /* ── Nav ─────────────────────────────────────────────────────── */
+    nav { background: #0F1E3C; border-bottom: 1px solid #1e3560; padding: 0 1.5rem; }
+    .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; gap: 1rem; }
+    .nav-logo { display: flex; align-items: center; gap: 8px; }
+    .nav-logo-text { font-family: 'DM Serif Display', serif; font-size: 1.25rem; color: #FAFAF8; }
+    .admin-badge { background: #F59E0B; color: #0F1E3C; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.06em; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; font-size: 0.78rem; color: #64748b; }
+    .btn-nav { background: none; border: 1px solid #2e4470; border-radius: 6px; padding: 0.3rem 0.875rem; font-family: inherit; font-size: 0.78rem; color: #94a3b8; cursor: pointer; }
+    .btn-nav:hover { border-color: #4a6090; color: #cbd5e1; }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    h1 { font-family: 'DM Serif Display', serif; font-size: 1.75rem; color: #f1f5f9; margin: 0 0 0.25rem; }
+    .page-sub { font-size: 0.82rem; color: #64748b; margin: 0 0 2rem; }
+
+    /* ── Stat cards ──────────────────────────────────────────────── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+    .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.25rem 1.5rem; }
+    .stat-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 0.4rem; }
+    .stat-value { font-family: 'DM Serif Display', serif; font-size: 2.25rem; color: #f1f5f9; line-height: 1; margin: 0 0 0.2rem; }
+    .stat-sub { font-size: 0.75rem; color: #475569; margin: 0; }
+
+    /* ── Section ─────────────────────────────────────────────────── */
+    .section { margin-bottom: 2.5rem; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .section-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin: 0; }
+
+    /* ── Tables ──────────────────────────────────────────────────── */
+    .table-wrap { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th { background: #0f172a; padding: 0.75rem 1rem; text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; border-bottom: 1px solid #334155; white-space: nowrap; }
+    tbody td { padding: 0.75rem 1rem; border-bottom: 1px solid #1e293b; color: #cbd5e1; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #263046; }
+    .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; }
+    .badge-admin { background: #F59E0B22; color: #F59E0B; border: 1px solid #F59E0B44; }
+    .badge-free  { background: #3b82f622; color: #93c5fd; border: 1px solid #3b82f644; }
+    .badge-pro   { background: #22c55e22; color: #86efac; border: 1px solid #22c55e44; }
+    .empty-row td { text-align: center; color: #475569; font-style: italic; padding: 2rem; }
+
+    /* ── Top forms bar chart ─────────────────────────────────────── */
+    .forms-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-bar-row { display: flex; align-items: center; gap: 0.75rem; }
+    .form-bar-name { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #94a3b8; min-width: 130px; flex-shrink: 0; text-align: right; }
+    .form-bar-track { flex: 1; background: #0f172a; border-radius: 4px; height: 22px; overflow: hidden; }
+    .form-bar-fill { height: 100%; background: linear-gradient(90deg, #1e3560, #F59E0B); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; transition: width 0.6s ease; min-width: 30px; }
+    .form-bar-count { font-size: 0.72rem; font-weight: 700; color: #0F1E3C; }
+
+    /* ── Refresh button ──────────────────────────────────────────── */
+    .btn-refresh { background: none; border: 1px solid #334155; border-radius: 6px; padding: 0.3rem 0.875rem; font-family: inherit; font-size: 0.75rem; color: #64748b; cursor: pointer; }
+    .btn-refresh:hover { border-color: #4a5568; color: #94a3b8; }
+
+    /* ── Timestamp ───────────────────────────────────────────────── */
+    .ts { font-size: 0.72rem; color: #475569; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<div id="auth-loading"><div class="spinner"></div></div>
+
+<div id="app">
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo">
+        <span aria-hidden="true">📋</span>
+        <span class="nav-logo-text">FormIQ</span>
+        <span class="admin-badge">ADMIN</span>
+      </div>
+      <div class="nav-right">
+        <span id="nav-email"></span>
+        <a href="/app" style="color:#94a3b8;text-decoration:none;font-size:0.78rem;">← App</a>
+        <button class="btn-nav" id="btn-signout">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page">
+    <h1>Dashboard</h1>
+    <p class="page-sub" id="last-updated">Loading…</p>
+
+    <!-- Stat cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p class="stat-label">Total Users</p>
+        <p class="stat-value" id="stat-users">—</p>
+        <p class="stat-sub">registered accounts</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Total Lookups</p>
+        <p class="stat-value" id="stat-lookups">—</p>
+        <p class="stat-sub">all time (last 1,000 logged)</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Lookups Today</p>
+        <p class="stat-value" id="stat-today">—</p>
+        <p class="stat-sub" id="stat-today-date"></p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Unique Forms</p>
+        <p class="stat-value" id="stat-forms">—</p>
+        <p class="stat-sub">distinct forms looked up</p>
+      </div>
+    </div>
+
+    <!-- Top forms -->
+    <div class="section">
+      <div class="section-header">
+        <p class="section-title">Top Forms by Lookups</p>
+      </div>
+      <div class="table-wrap" style="padding:1.25rem 1.5rem;">
+        <div class="forms-grid" id="forms-chart">
+          <p style="color:#475569;font-size:0.82rem;font-style:italic;">No lookups yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent lookups -->
+    <div class="section">
+      <div class="section-header">
+        <p class="section-title">Recent Lookups</p>
+        <button class="btn-refresh" id="btn-refresh">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>User</th>
+              <th>Form</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="recent-tbody">
+            <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="section">
+      <div class="section-header">
+        <p class="section-title">All Users</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Signed Up</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── Auth ────────────────────────────────────────────────────── */
+  fetch('/api/me')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || data.plan !== 'admin') {
+        window.location.href = '/';
+        return;
+      }
+      document.getElementById('nav-email').textContent = data.email;
+      document.getElementById('auth-loading').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      loadReport();
+    })
+    .catch(function() { window.location.href = '/'; });
+
+  document.getElementById('btn-signout').addEventListener('click', function() {
+    fetch('/api/logout', { method: 'POST' }).finally(function() {
+      window.location.href = '/';
+    });
+  });
+
+  document.getElementById('btn-refresh').addEventListener('click', loadReport);
+
+  /* ── Load report ─────────────────────────────────────────────── */
+  function loadReport() {
+    document.getElementById('last-updated').textContent = 'Refreshing…';
+    fetch('/api/admin/report')
+      .then(function(r) {
+        if (!r.ok) throw new Error('Failed to load report');
+        return r.json();
+      })
+      .then(renderReport)
+      .catch(function(err) {
+        document.getElementById('last-updated').textContent = 'Error: ' + err.message;
+      });
+  }
+
+  /* ── Render ──────────────────────────────────────────────────── */
+  function renderReport(d) {
+    var now = new Date();
+    document.getElementById('last-updated').textContent =
+      'Last updated: ' + now.toLocaleTimeString();
+
+    // Stats
+    document.getElementById('stat-users').textContent   = d.users.length;
+    document.getElementById('stat-lookups').textContent = d.totalLookups;
+    document.getElementById('stat-today').textContent   = d.todayLookups;
+    document.getElementById('stat-today-date').textContent = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById('stat-forms').textContent   = Object.keys(d.formCounts).length;
+
+    // Top forms chart
+    var formEntries = Object.entries(d.formCounts || {})
+      .sort(function(a, b) { return Number(b[1]) - Number(a[1]); })
+      .slice(0, 15);
+    var maxCount = formEntries.length ? Number(formEntries[0][1]) : 1;
+    var chartEl = document.getElementById('forms-chart');
+    if (!formEntries.length) {
+      chartEl.innerHTML = '<p style="color:#475569;font-size:0.82rem;font-style:italic;">No lookups recorded yet.</p>';
+    } else {
+      chartEl.innerHTML = formEntries.map(function(e) {
+        var name = escHtml(e[0]);
+        var count = Number(e[1]);
+        var pct = Math.max(4, Math.round((count / maxCount) * 100));
+        return '<div class="form-bar-row">' +
+          '<span class="form-bar-name">' + name + '</span>' +
+          '<div class="form-bar-track">' +
+            '<div class="form-bar-fill" style="width:' + pct + '%">' +
+              '<span class="form-bar-count">' + count + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Recent lookups table
+    var recentTbody = document.getElementById('recent-tbody');
+    if (!d.recent || !d.recent.length) {
+      recentTbody.innerHTML = '<tr class="empty-row"><td colspan="4">No lookups recorded yet.</td></tr>';
+    } else {
+      recentTbody.innerHTML = d.recent.map(function(l, i) {
+        return '<tr>' +
+          '<td class="mono" style="color:#475569;">' + (i + 1) + '</td>' +
+          '<td class="mono">' + escHtml(l.email || '—') + '</td>' +
+          '<td style="color:#f1f5f9;font-weight:500;">' + escHtml(l.formName || '—') + '</td>' +
+          '<td class="ts">' + formatTs(l.ts) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    // Users table
+    var usersTbody = document.getElementById('users-tbody');
+    if (!d.users || !d.users.length) {
+      usersTbody.innerHTML = '<tr class="empty-row"><td colspan="4">No users found.</td></tr>';
+    } else {
+      usersTbody.innerHTML = d.users.map(function(u, i) {
+        var planBadge = '<span class="badge badge-' + escHtml(u.plan) + '">' + escHtml(u.plan.toUpperCase()) + '</span>';
+        return '<tr>' +
+          '<td class="mono" style="color:#475569;">' + (i + 1) + '</td>' +
+          '<td class="mono">' + escHtml(u.email) + '</td>' +
+          '<td>' + planBadge + '</td>' +
+          '<td class="ts">' + formatTs(u.registeredAt) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+  }
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  function formatTs(ts) {
+    if (!ts) return '—';
+    try {
+      var d = new Date(ts);
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+             ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch { return ts; }
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+</script>
+</body>
+</html>
