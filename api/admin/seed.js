@@ -2,7 +2,8 @@ const { createKV, hashPassword, createSalt } = require('../_utils');
 const kv = createKV();
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  // Accept GET so it can be triggered by visiting the URL in a browser
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
   const existing = await kv.get('user:admin');
   if (existing) {
