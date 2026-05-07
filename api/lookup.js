@@ -4,7 +4,7 @@ const kv = createKV();
 
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
 
-When given a form name, you return a structured JSON object with EXACTLY this shape:
+When given a form name, return a structured JSON object with EXACTLY this shape:
 
 {
   "found": true,
@@ -15,19 +15,40 @@ When given a form name, you return a structured JSON object with EXACTLY this sh
   "who_needs_it": ["bullet 1", "bullet 2", "bullet 3"],
   "deadline": "When it must be filed, or null if not applicable",
   "where_to_submit": "Where to send or submit it, or null if not applicable",
-  "official_pdf_url": "Direct https:// URL to download the blank official PDF form (e.g. https://www.irs.gov/pub/irs-pdf/f1040.pdf). Must be a direct PDF download link, not an HTML page. Return null if the form is online-only, employer-generated, or you are not certain of the exact URL.",
+  "official_pdf_url": "Direct https:// URL to download the blank official PDF form. Must be a direct PDF download link, not an HTML page. Return null if the form is online-only, employer-generated, or you are not certain of the exact URL.",
   "instructions": [
+    CRITICAL: Include an entry for EVERY SINGLE field printed on the form — no exceptions.
+    This includes: all numbered boxes, checkboxes, signature lines, date fields, part headers
+    with sub-fields, optional fields, and certification blocks. Do NOT skip any field even if
+    it seems obvious or optional. List fields in the same order they appear on the form.
     {
-      "field": "Exact field name as printed on the form",
-      "instruction": "Plain English instruction for this field",
-      "warning": "Optional: common mistake or tricky note, or null"
+      "field": "Exact label as printed on the form, including box number if present (e.g. 'Box 1 — Wages, tips, other compensation')",
+      "instruction": "Specific, actionable Plain English instruction for exactly this field. Mention what to enter, where to find the value, and what format to use.",
+      "warning": "The single most common mistake people make on this specific field, or null if none"
     }
   ],
   "tips": ["tip 1", "tip 2", "tip 3"],
   "sample": [
+    CRITICAL RULES FOR SAMPLE DATA:
+    1. Every field listed in instructions MUST have a matching entry here.
+    2. Use this consistent fictional person throughout — never vary:
+       Name: Alex Rivera | DOB: March 15, 1985 | SSN: 000-00-1234
+       Address: 142 Maple Street, Austin, TX 78701 | Phone: (512) 555-0182
+       Email: alex.rivera@brightpath.com | Occupation: Senior Project Manager
+       Employer: Brightpath Solutions Inc | EIN: 47-2381650
+       Employer address: 980 Congress Ave, Austin, TX 78701 | Employer phone: (512) 555-9200
+       Spouse: Jordan Rivera | DOB: June 4, 1983 | SSN: 000-00-5678
+       Bank: First National Bank | Routing: 121000248 | Account ending: 4821
+       Passport: Z12345678 (issued Jan 10 2020, expires Jan 9 2030)
+       Country of birth: United States | Citizenship: U.S. Citizen
+    3. Values must be realistic and form-appropriate — not generic placeholders like "Enter value here".
+    4. For dollar amounts use realistic figures consistent with the occupation (e.g. salary ~$92,000/yr).
+    5. For dates use specific dates (e.g. "03/15/1985") not vague ranges.
+    6. For checkboxes write exactly "Yes", "No", or the option to select.
+    7. Match field names exactly to the instructions list.
     {
-      "field": "Exact field name",
-      "value": "Realistic dummy value using Alex Rivera, SSN XXX-XX-1234, 142 Maple Street Austin TX 78701, employer Brightpath Solutions Inc."
+      "field": "Exact field label matching the instructions entry",
+      "value": "Specific, realistic value for Alex Rivera"
     }
   ]
 }
@@ -92,7 +113,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        max_tokens: 8000,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: `Form name: ${formName}` }],
       }),

@@ -99,13 +99,25 @@
     .sample-value { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #0F1E3C; font-weight: 500; flex: 1; }
     .sample-note { margin-top: 0.6rem; text-align: center; font-size: 0.72rem; color: #94a3b8; }
 
-    /* ── Download bar ───────────────────────────────────────────── */
-    .dl-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.25rem; padding: 0.875rem 1rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; }
+    /* ── Download / preview bar ─────────────────────────────────── */
+    .dl-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; padding: 0.875rem 1rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; }
     .dl-bar-text { font-size: 0.82rem; color: #166534; flex: 1; line-height: 1.45; }
-    .btn-fill { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #0F1E3C; color: #FAFAF8; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+    .btn-fill    { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #0F1E3C; color: #FAFAF8; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
     .btn-fill:disabled { background: #94a3b8; cursor: not-allowed; }
-    .btn-blank { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; background: #fff; color: #0F1E3C; border: 1.5px solid #0F1E3C; border-radius: 7px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; }
+    .btn-preview { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #F59E0B; color: #0F1E3C; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+    .btn-preview:disabled { background: #94a3b8; color: #fff; cursor: not-allowed; }
+    .btn-blank   { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; background: #fff; color: #0F1E3C; border: 1.5px solid #0F1E3C; border-radius: 7px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; }
     .no-pdf-note { font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem; font-style: italic; }
+
+    /* ── Inline PDF viewer ──────────────────────────────────────── */
+    .pdf-viewer-wrap { margin-bottom: 1.25rem; border: 2px solid #0F1E3C; border-radius: 10px; overflow: hidden; }
+    .pdf-viewer-bar  { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1rem; background: #0F1E3C; flex-wrap: wrap; gap: 0.5rem; }
+    .pdf-viewer-label { font-size: 0.78rem; color: #94a3b8; font-family: 'IBM Plex Mono', monospace; }
+    .pdf-viewer-actions { display: flex; gap: 0.5rem; }
+    .pdf-viewer-btn { padding: 0.3rem 0.75rem; font-family: inherit; font-size: 0.75rem; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; }
+    .pdf-viewer-close { background: #374151; color: #e2e8f0; }
+    .pdf-viewer-dl    { background: #F59E0B; color: #0F1E3C; text-decoration: none; display: inline-block; }
+    .pdf-frame { display: block; width: 100%; height: 780px; border: none; }
 
     /* ── Footer ─────────────────────────────────────────────────── */
     footer { max-width: 720px; margin: 2rem auto 0; padding: 1.25rem 1.25rem 2rem; border-top: 1px solid #e2e8f0; text-align: center; }
@@ -373,11 +385,12 @@
       });
     });
 
-    // Wire up fill-form button
+    // Wire up fill-form buttons
     var fillBtn = document.getElementById('btn-fill-form');
-    if (fillBtn) {
-      fillBtn.addEventListener('click', function() { downloadFilledForm(); });
-    }
+    if (fillBtn) fillBtn.addEventListener('click', function() { downloadFilledForm(); });
+
+    var previewBtn = document.getElementById('btn-preview-form');
+    if (previewBtn) previewBtn.addEventListener('click', function() { previewFilledForm(); });
   }
 
   function renderTabBar() {
@@ -444,12 +457,14 @@
     if (r.official_pdf_url) {
       dlBar =
         '<div class="dl-bar">' +
-          '<span class="dl-bar-text">📄 Official PDF found — download a pre-filled copy with the sample data already entered.</span>' +
-          '<a href="' + escAttr(r.official_pdf_url) + '" target="_blank" rel="noopener" class="btn-blank">Download Blank</a>' +
-          '<button class="btn-fill" id="btn-fill-form">⬇ Download Pre-filled</button>' +
-        '</div>';
+          '<span class="dl-bar-text">📄 Official PDF found — preview or download the form pre-filled with sample data.</span>' +
+          '<a href="' + escAttr(r.official_pdf_url) + '" target="_blank" rel="noopener" class="btn-blank">Blank PDF</a>' +
+          '<button class="btn-preview" id="btn-preview-form">👁 Preview Filled</button>' +
+          '<button class="btn-fill" id="btn-fill-form">⬇ Download</button>' +
+        '</div>' +
+        '<div id="pdf-viewer-wrap" style="display:none;"></div>';
     } else {
-      dlBar = '<p class="no-pdf-note">No official downloadable PDF found for this form (it may be submitted online or generated by an employer).</p>';
+      dlBar = '<p class="no-pdf-note">No official downloadable PDF for this form (submitted online or employer-generated).</p>';
     }
 
     return dlBar +
@@ -457,7 +472,7 @@
         '<div class="sample-watermark" aria-hidden="true">SAMPLE — NOT FOR SUBMISSION</div>' +
         '<div class="sample-table">' +
           '<div class="sample-header">' +
-            '<div><p class="sample-title">' + escHtml(r.form_name) + '</p><p class="sample-subtitle">Sample completion · Alex Rivera</p></div>' +
+            '<div><p class="sample-title">' + escHtml(r.form_name) + '</p><p class="sample-subtitle">All fields · Alex Rivera · fictional data</p></div>' +
             '<span class="sample-badge">SAMPLE</span>' +
           '</div>' +
           rows +
@@ -534,6 +549,85 @@
         } else {
           errEl.textContent = msg;
         }
+        dlBar.appendChild(errEl);
+      }
+    });
+  }
+
+  /* ── Preview filled PDF inline ───────────────────────────────── */
+  var previewBlobUrl = null;
+
+  function previewFilledForm() {
+    if (!currentResult) return;
+    var btn = document.getElementById('btn-preview-form');
+    var wrap = document.getElementById('pdf-viewer-wrap');
+    if (!btn || !wrap) return;
+
+    // If already showing, toggle off
+    if (wrap.style.display !== 'none') {
+      wrap.style.display = 'none';
+      btn.textContent = '👁 Preview Filled';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading…';
+
+    fetch('/api/fill-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        formName: currentResult.form_name,
+        pdfUrl:   currentResult.official_pdf_url,
+        fields:   currentResult.sample,
+      }),
+    })
+    .then(function(res) {
+      if (!res.ok) {
+        return res.json().catch(function() { return {}; }).then(function(d) {
+          throw new Error(d.error || 'Server error ' + res.status);
+        });
+      }
+      return res.blob();
+    })
+    .then(function(blob) {
+      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+      previewBlobUrl = URL.createObjectURL(blob);
+
+      var safeName = (currentResult.form_name || 'form').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-filled.pdf';
+      wrap.innerHTML =
+        '<div class="pdf-viewer-wrap">' +
+          '<div class="pdf-viewer-bar">' +
+            '<span class="pdf-viewer-label">📋 ' + escHtml(currentResult.form_name) + ' — filled with sample data (Alex Rivera)</span>' +
+            '<div class="pdf-viewer-actions">' +
+              '<a href="' + previewBlobUrl + '" download="' + escAttr(safeName) + '" class="pdf-viewer-btn pdf-viewer-dl">⬇ Download</a>' +
+              '<button class="pdf-viewer-btn pdf-viewer-close" id="btn-close-preview">✕ Close</button>' +
+            '</div>' +
+          '</div>' +
+          '<iframe class="pdf-frame" src="' + previewBlobUrl + '" title="Filled form preview"></iframe>' +
+        '</div>';
+      wrap.style.display = 'block';
+      wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      document.getElementById('btn-close-preview').addEventListener('click', function() {
+        wrap.style.display = 'none';
+        btn.textContent = '👁 Preview Filled';
+      });
+
+      btn.disabled = false;
+      btn.textContent = '👁 Hide Preview';
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = '👁 Preview Filled';
+      var dlBar = btn.closest ? btn.closest('.dl-bar') : null;
+      if (dlBar) {
+        var prev = dlBar.querySelector('.dl-err');
+        if (prev) prev.parentNode.removeChild(prev);
+        var errEl = document.createElement('div');
+        errEl.className = 'dl-err';
+        errEl.style.cssText = 'margin-top:0.5rem;font-size:0.8rem;color:#b91c1c;width:100%;';
+        errEl.textContent = '⚠️ ' + err.message;
         dlBar.appendChild(errEl);
       }
     });
