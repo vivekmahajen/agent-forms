@@ -143,7 +143,13 @@
     .btn-preview { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #F59E0B; color: #0F1E3C; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
     .btn-preview:disabled { background: #94a3b8; color: #fff; cursor: not-allowed; }
     .btn-blank   { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 500; background: #fff; color: #0F1E3C; border: 1.5px solid #0F1E3C; border-radius: 7px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; }
-    .btn-guide   { padding: 0.6rem 1.1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #7c3aed; color: #fff; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+    .btn-guide   { padding: 0.6rem 1.25rem; font-family: inherit; font-size: 0.85rem; font-weight: 600; background: #7c3aed; color: #fff; border: none; border-radius: 7px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .btn-guide:hover { background: #6d28d9; }
+    .guide-bar   { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: 1rem 1.25rem; background: linear-gradient(135deg, #f5f3ff, #ede9fe); border: 1.5px solid #c4b5fd; border-radius: 12px; flex-wrap: wrap; }
+    .guide-bar-left { display: flex; align-items: center; gap: 0.75rem; }
+    .guide-bar-icon { font-size: 1.75rem; line-height: 1; }
+    .guide-bar-title { margin: 0 0 2px; font-weight: 700; font-size: 0.9rem; color: #4c1d95; }
+    .guide-bar-sub   { margin: 0; font-size: 0.78rem; color: #6d28d9; }
     .no-pdf-note { font-size: 0.82rem; color: #94a3b8; margin: 0 0 1.25rem; font-style: italic; }
 
     /* ── Inline PDF viewer ──────────────────────────────────────── */
@@ -414,7 +420,19 @@
   /* ── Result rendering ────────────────────────────────────────── */
   function showResult(r) {
     currentResult = r;
+    var guideBar =
+      '<div class="guide-bar">' +
+        '<div class="guide-bar-left">' +
+          '<span class="guide-bar-icon">🤖</span>' +
+          '<div>' +
+            '<p class="guide-bar-title">Not sure how to fill this out?</p>' +
+            '<p class="guide-bar-sub">Let our AI walk you through every field, one step at a time.</p>' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn-guide" id="btn-guide-form">Guide me through this →</button>' +
+      '</div>';
     var html =
+      guideBar +
       '<div class="card fade-in">' +
         renderTabBar() +
         '<div id="panel-overview"  class="tab-panel active">' + renderOverview(r)     + '</div>' +
@@ -602,24 +620,18 @@
       '</div>';
     }).join('');
 
-    var guideBtn = '<button class="btn-guide" id="btn-guide-form">🤖 Guide me through this</button>';
     var dlBar = '';
     if (r.official_pdf_url) {
       dlBar =
         '<div class="dl-bar">' +
           '<span class="dl-bar-text">📄 Official PDF found — preview or download the form pre-filled with sample data.</span>' +
-          guideBtn +
           '<a href="' + escAttr(r.official_pdf_url) + '" target="_blank" rel="noopener" class="btn-blank">Blank PDF</a>' +
           '<button class="btn-preview" id="btn-preview-form">👁 Preview Filled</button>' +
           '<button class="btn-fill" id="btn-fill-form">⬇ Download</button>' +
         '</div>' +
         '<div id="pdf-viewer-wrap" style="display:none;"></div>';
     } else {
-      dlBar =
-        '<div class="dl-bar" style="background:#f5f3ff;border-color:#ddd6fe;">' +
-          '<span class="dl-bar-text" style="color:#5b21b6;">This form is submitted online or employer-generated — no downloadable PDF.</span>' +
-          guideBtn +
-        '</div>';
+      dlBar = '<p class="no-pdf-note">No official downloadable PDF for this form (submitted online or employer-generated).</p>';
     }
 
     return dlBar +
