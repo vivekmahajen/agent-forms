@@ -463,7 +463,12 @@
     var guideBtn = document.getElementById('btn-guide-form');
     if (guideBtn) guideBtn.addEventListener('click', function() {
       if (window.FiqChat && currentResult && Array.isArray(currentResult.instructions)) {
-        window.FiqChat.startGuide(currentResult.form_name, currentResult.instructions);
+        var hasPdf = !!currentResult.official_pdf_url;
+        window.FiqChat.startGuide(
+          currentResult.form_name,
+          currentResult.instructions,
+          hasPdf ? function (done) { downloadFilledForm(done); } : null
+        );
       }
     });
 
@@ -664,12 +669,11 @@
   }
 
   /* ── Download pre-filled PDF ─────────────────────────────────── */
-  function downloadFilledForm() {
-    if (!currentResult) return;
+  // done(ok) is an optional callback used when triggered from the chat widget
+  function downloadFilledForm(done) {
+    if (!currentResult) { if (done) done(false); return; }
     var btn = document.getElementById('btn-fill-form');
-    if (!btn) return;
-    btn.disabled = true;
-    btn.textContent = '⏳ Preparing…';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparing…'; }
 
     var fillRes;
     fetch('/api/fill-form', {
@@ -701,34 +705,38 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      btn.disabled = false;
-      var label = filled > 0
-        ? '✓ Downloaded (' + filled + '/' + total + ' fields filled)'
-        : '✓ Downloaded';
-      btn.textContent = label;
-      setTimeout(function() { if (btn) btn.textContent = '⬇ Download Pre-filled'; }, 4000);
+      if (btn) {
+        btn.disabled = false;
+        var label = filled > 0
+          ? '✓ Downloaded (' + filled + '/' + total + ' fields filled)'
+          : '✓ Downloaded';
+        btn.textContent = label;
+        setTimeout(function() { if (btn) btn.textContent = '⬇ Download Pre-filled'; }, 4000);
+      }
+      if (done) done(true);
     })
     .catch(function(err) {
-      btn.disabled = false;
-      btn.textContent = '⬇ Download Pre-filled';
-      var dlBar = btn.closest ? btn.closest('.dl-bar') : null;
-      if (dlBar) {
-        // Remove any previous error
-        var prev = dlBar.querySelector('.dl-err');
-        if (prev) prev.parentNode.removeChild(prev);
-
-        var errEl = document.createElement('div');
-        errEl.className = 'dl-err';
-        errEl.style.cssText = 'margin-top:0.6rem;font-size:0.8rem;color:#b91c1c;width:100%;line-height:1.5;';
-        var msg = '⚠️ ' + err.message;
-        if (err.fallbackUrl) {
-          msg += ' — <a href="' + escAttr(err.fallbackUrl) + '" target="_blank" rel="noopener" style="color:#1d4ed8;">Download blank form instead</a>';
-          errEl.innerHTML = msg;
-        } else {
-          errEl.textContent = msg;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '⬇ Download Pre-filled';
+        var bar = btn.closest ? btn.closest('.dl-bar') : null;
+        if (bar) {
+          var prev = bar.querySelector('.dl-err');
+          if (prev) prev.parentNode.removeChild(prev);
+          var errEl = document.createElement('div');
+          errEl.className = 'dl-err';
+          errEl.style.cssText = 'margin-top:0.6rem;font-size:0.8rem;color:#b91c1c;width:100%;line-height:1.5;';
+          var msg = '⚠️ ' + err.message;
+          if (err.fallbackUrl) {
+            msg += ' — <a href="' + escAttr(err.fallbackUrl) + '" target="_blank" rel="noopener" style="color:#1d4ed8;">Download blank form instead</a>';
+            errEl.innerHTML = msg;
+          } else {
+            errEl.textContent = msg;
+          }
+          bar.appendChild(errEl);
         }
-        dlBar.appendChild(errEl);
       }
+      if (done) done(false);
     });
   }
 

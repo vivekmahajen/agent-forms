@@ -124,6 +124,20 @@
 
     /* Footer */
     #fiq-footer { padding: 10px 12px; border-top: 1px solid #f1f5f9; flex-shrink: 0; }
+    #fiq-dl-bar {
+      display: none; align-items: center; gap: 8px; margin-bottom: 8px;
+      padding: 8px 10px; background: #f5f3ff; border: 1.5px solid #c4b5fd;
+      border-radius: 8px;
+    }
+    #fiq-dl-bar.visible { display: flex; }
+    #fiq-dl-bar-text { flex: 1; font-size: 0.72rem; color: #5b21b6; line-height: 1.35; }
+    #fiq-dl-btn {
+      padding: 5px 12px; font-family: inherit; font-size: 0.75rem; font-weight: 700;
+      background: #7c3aed; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    #fiq-dl-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    #fiq-dl-btn:hover:not(:disabled) { background: #6d28d9; }
     #fiq-form { display: flex; gap: 8px; align-items: flex-end; }
     #fiq-input {
       flex: 1; resize: none; border: 1.5px solid #e2e8f0; border-radius: 10px;
@@ -178,6 +192,10 @@
     '<div id="fiq-suggestions"></div>' +
     // Input
     '<div id="fiq-footer">' +
+      '<div id="fiq-dl-bar">' +
+        '<span id="fiq-dl-bar-text">Ready to download your filled PDF?</span>' +
+        '<button id="fiq-dl-btn" type="button">📥 Download filled PDF</button>' +
+      '</div>' +
       '<form id="fiq-form">' +
         '<textarea id="fiq-input" rows="1" placeholder="Ask anything about forms…" aria-label="Chat message"></textarea>' +
         '<button type="submit" id="fiq-send" aria-label="Send">' +
@@ -189,13 +207,28 @@
   document.body.appendChild(panel);
 
   // ── Refs ─────────────────────────────────────────────────────────
-  var messagesEl   = document.getElementById('fiq-messages');
+  var messagesEl    = document.getElementById('fiq-messages');
   var suggestionsEl = document.getElementById('fiq-suggestions');
-  var inputEl      = document.getElementById('fiq-input');
-  var sendBtn      = document.getElementById('fiq-send');
-  var unreadDot    = document.getElementById('fiq-unread');
-  var isOpen       = false;
-  var isStreaming  = false;
+  var inputEl       = document.getElementById('fiq-input');
+  var sendBtn       = document.getElementById('fiq-send');
+  var unreadDot     = document.getElementById('fiq-unread');
+  var dlBar         = document.getElementById('fiq-dl-bar');
+  var dlBtn         = document.getElementById('fiq-dl-btn');
+  var isOpen        = false;
+  var isStreaming   = false;
+  var downloadCallback = null;
+
+  dlBtn.addEventListener('click', function () {
+    if (typeof downloadCallback === 'function') {
+      dlBtn.disabled = true;
+      dlBtn.textContent = '⏳ Building PDF…';
+      downloadCallback(function (ok) {
+        dlBtn.disabled = false;
+        dlBtn.textContent = ok ? '✅ Downloaded!' : '📥 Download filled PDF';
+        if (ok) setTimeout(function () { dlBtn.textContent = '📥 Download filled PDF'; }, 3000);
+      });
+    }
+  });
 
   // ── Suggestions ──────────────────────────────────────────────────
   var SUGGESTIONS = [
@@ -365,12 +398,25 @@
     open: open,
 
     // Start a guided form-filling session from the app page
-    startGuide: function (formName, fields) {
+    // onDownload(callback) is called when the user clicks the in-chat download button
+    startGuide: function (formName, fields, onDownload) {
       // Reset state
       activeFormContext = { formName: formName, fields: fields };
+      downloadCallback = typeof onDownload === 'function' ? onDownload : null;
       history = [];
       messagesEl.innerHTML = '';
       suggestionsEl.style.display = 'none';
+
+      // Show download bar if a PDF is available
+      if (downloadCallback) {
+        dlBar.classList.add('visible');
+        document.getElementById('fiq-dl-bar-text').textContent =
+          'Fill in your details below, then download your PDF.';
+        dlBtn.disabled = false;
+        dlBtn.textContent = '📥 Download filled PDF';
+      } else {
+        dlBar.classList.remove('visible');
+      }
 
       // Update header to show guide mode
       var nameEl = document.getElementById('fiq-header-name');
@@ -383,9 +429,11 @@
       sendMessage('Please guide me through filling out ' + formName + ', one section at a time.');
     },
 
-    // Reset to normal chat mode (called if user navigates away)
+    // Reset to normal chat mode
     resetGuide: function () {
       activeFormContext = null;
+      downloadCallback = null;
+      dlBar.classList.remove('visible');
       var nameEl = document.getElementById('fiq-header-name');
       var statusEl = document.getElementById('fiq-status-text');
       if (nameEl) nameEl.textContent = 'FormIQ Assistant';
