@@ -25,9 +25,7 @@ Return ONLY valid JSON — no markdown, no backticks, no preamble:
       "field": "<field label as it would appear on the target form>",
       "value": "<extracted value — exact text from the document>",
       "confidence": "<high | medium | low>",
-      "note": "<null, or brief explanation when confidence is medium/low>",
-      "reasoning": "<one sentence: cite the exact location in the document where this value was found, e.g. 'Taken from the box labeled Employer Identification Number in the top-right corner of the CP 575 letter' or 'Read from Line 1 — Legal name on the W-9'>",
-      "action": "<what the user should do if this value is wrong — calibrate to confidence: high → 'Edit the value above if needed.'; medium → 'Review carefully against your original document before applying.'; low → 'Verify against the original document — the value may be only partially visible.'>"
+      "note": "<null, or brief explanation when confidence is medium/low>"
     }
   ]
 }
@@ -43,8 +41,6 @@ Additional rules:
 - For SSNs keep XXX-XX-XXXX format; for EINs keep XX-XXXXXXX format
 - Only extract fields relevant to the target form — skip unrelated data
 - Never fabricate or guess values; if a field is unreadable, set confidence "low" and describe what you can partially see in the note
-- For "reasoning": always cite the specific document location (box number, section heading, line label) — never write generic phrases like "found in the document"
-- For "action": write one concrete sentence the user can act on immediately
 - If you cannot identify the document type, set docType to "Unknown document"`;
 
 module.exports = async function handler(req, res) {
@@ -119,8 +115,7 @@ module.exports = async function handler(req, res) {
     const clean = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
     const result = JSON.parse(clean);
 
-    // Add source label and privacy note (document not retained)
-    result.source = 'Uploaded document';
+    // Explicitly note: document not retained
     result.privacyNote = 'This document was processed in real-time and has not been stored.';
 
     // Version mismatch detection: compare uploaded document revision to stored current

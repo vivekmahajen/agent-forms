@@ -165,28 +165,10 @@
     }
     .fiq-extract-title { font-weight: 700; color: #0F1E3C; margin: 0 0 6px; font-size: 0.82rem; }
     .fiq-extract-subtitle { color: #64748b; margin: 0 0 8px; font-size: 0.72rem; }
-    .fiq-extract-row { display: flex; align-items: flex-start; gap: 6px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .fiq-extract-row { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
     .fiq-extract-row:last-of-type { border-bottom: none; }
-    .fiq-extract-row.needs-review { background: #fffbeb; border-radius: 6px; padding: 5px 6px; margin: 1px -6px; border-bottom: none; border-top: 1px solid #fde68a; }
-    .fiq-extract-row.needs-review:first-of-type { border-top: none; }
-    .fiq-extract-col { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .fiq-extract-top { display: flex; gap: 6px; align-items: center; }
-    .fiq-extract-field { flex: 1; color: #475569; font-size: 0.72rem; }
-    .fiq-extract-val { flex: 1.4; min-width: 0; }
-    /* Reasoning annotation */
-    details.fiq-reasoning { border-top: 1px dashed #e2e8f0; margin-top: 3px; padding-top: 2px; }
-    details.fiq-reasoning summary { cursor: pointer; font-size: 0.68rem; color: #7c3aed; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 3px; user-select: none; }
-    details.fiq-reasoning summary::-webkit-details-marker { display: none; }
-    details.fiq-reasoning summary::before { content: '▶'; font-size: 0.52rem; display: inline-block; transition: transform 0.15s; }
-    details[open].fiq-reasoning summary::before { transform: rotate(90deg); }
-    .fiq-reasoning-body { padding: 5px 0 2px; display: flex; flex-direction: column; gap: 4px; }
-    .fiq-reasoning-line { display: flex; gap: 6px; font-size: 0.69rem; line-height: 1.45; }
-    .fiq-reasoning-label { font-weight: 700; color: #64748b; min-width: 62px; flex-shrink: 0; padding-top: 1px; }
-    .fiq-reasoning-value { color: #334155; }
-    .fiq-conf-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.02em; }
-    .fiq-conf-badge.high   { background: #dcfce7; color: #15803d; }
-    .fiq-conf-badge.medium { background: #fef9c3; color: #854d0e; }
-    .fiq-conf-badge.low    { background: #fee2e2; color: #b91c1c; }
+    .fiq-extract-field { flex: 1; color: #475569; font-size: 0.72rem; padding-top: 1px; }
+    .fiq-extract-val { flex: 1.4; }
     .fiq-extract-input {
       width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.75rem;
       border: 1.5px solid #e2e8f0; border-radius: 5px; padding: 3px 6px; color: #1e293b;
@@ -429,60 +411,25 @@
     reader.readAsDataURL(file);
   }
 
-  // Field names that must always show reasoning expanded (tax elections, entity classification, responsible party)
-  var ALWAYS_EXPAND_RE = /entity.?type|responsible.?party|class(?:ification)?|election|s[- ]?corp|officer|director|trustee|grantor|fiduciary|tax.?year|filing.?status|relationship.?to/i;
-
   function renderExtractionCard(bubble, data, formName) {
     var fields = (data.fields || []);
     var docType = data.docType || 'Document';
-    var source  = data.source  || 'Uploaded document';
 
     if (!fields.length) {
       bubble.textContent = 'I couldn\'t find any relevant fields in this document for ' + (formName || 'this form') + '.';
       return;
     }
 
-    var CONF_LABEL = { high: 'High', medium: 'Medium', low: 'Needs review' };
-
-    var rows = fields.map(function (f) {
-      var conf  = f.confidence || 'high';
-      var isNeedsReview = conf === 'low';
-      var isAmber       = conf === 'medium' || isNeedsReview;
-      var dotClass      = 'fiq-conf-' + conf;
-      var note          = f.note ? ' title="' + escHtml(f.note) + '"' : '';
-
-      // Open reasoning by default for low-confidence or critical fields
-      var alwaysOpen = isNeedsReview || ALWAYS_EXPAND_RE.test(f.field);
-
-      // Reasoning annotation (collapsed/expanded details panel)
-      var reasoningHtml = '';
-      if (f.reasoning || f.action) {
-        var actionText = f.action || (isNeedsReview
-          ? 'Verify against your original document before applying. Edit the value above if needed.'
-          : 'Edit the value above if it\'s incorrect.');
-        reasoningHtml =
-          '<details class="fiq-reasoning"' + (alwaysOpen ? ' open' : '') + '>' +
-            '<summary>Why this value?</summary>' +
-            '<div class="fiq-reasoning-body">' +
-              '<div class="fiq-reasoning-line"><span class="fiq-reasoning-label">Source</span><span class="fiq-reasoning-value">' + escHtml(source) + '</span></div>' +
-              (f.reasoning ? '<div class="fiq-reasoning-line"><span class="fiq-reasoning-label">Reasoning</span><span class="fiq-reasoning-value">' + escHtml(f.reasoning) + '</span></div>' : '') +
-              '<div class="fiq-reasoning-line"><span class="fiq-reasoning-label">Confidence</span><span class="fiq-reasoning-value"><span class="fiq-conf-badge ' + conf + '">' + (CONF_LABEL[conf] || conf) + '</span></span></div>' +
-              '<div class="fiq-reasoning-line"><span class="fiq-reasoning-label">If wrong</span><span class="fiq-reasoning-value">' + escHtml(actionText) + '</span></div>' +
-            '</div>' +
-          '</details>';
-      }
-
-      return '<div class="fiq-extract-row' + (isNeedsReview ? ' needs-review' : '') + '">' +
-        '<span class="fiq-conf-dot ' + dotClass + '"' + note + ' style="margin-top:4px;"></span>' +
-        '<div class="fiq-extract-col">' +
-          '<div class="fiq-extract-top">' +
-            '<span class="fiq-extract-field">' + escHtml(f.field) + '</span>' +
-            '<span class="fiq-extract-val">' +
-              '<input class="fiq-extract-input' + (isAmber ? ' amber' : '') + '" data-field="' + escHtml(f.field) + '" value="' + escHtml(f.value || '') + '" />' +
-            '</span>' +
-          '</div>' +
-          reasoningHtml +
-        '</div>' +
+    var rows = fields.map(function (f, i) {
+      var isAmber = f.confidence === 'medium' || f.confidence === 'low';
+      var dotClass = 'fiq-conf-' + (f.confidence || 'high');
+      var note = f.note ? ' title="' + escHtml(f.note) + '"' : '';
+      return '<div class="fiq-extract-row">' +
+        '<span class="fiq-conf-dot ' + dotClass + '"' + note + '></span>' +
+        '<span class="fiq-extract-field">' + escHtml(f.field) + '</span>' +
+        '<span class="fiq-extract-val">' +
+          '<input class="fiq-extract-input' + (isAmber ? ' amber' : '') + '" data-field="' + escHtml(f.field) + '" value="' + escHtml(f.value || '') + '" />' +
+        '</span>' +
       '</div>';
     }).join('');
 
