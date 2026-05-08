@@ -223,7 +223,7 @@
     dlBtn.disabled = true;
     dlBtn.textContent = '⏳ Building PDF…';
     document.getElementById('fiq-dl-bar-text').textContent = 'Extracting your answers and filling the form…';
-    downloadCallback(function (ok, errMsg) {
+    downloadCallback(function (ok, errMsg, fallbackUrl) {
       dlBtn.disabled = false;
       if (ok) {
         dlBtn.textContent = '✅ Downloaded!';
@@ -234,7 +234,13 @@
         }, 4000);
       } else {
         dlBtn.textContent = '📥 Try again';
-        document.getElementById('fiq-dl-bar-text').textContent = '⚠️ ' + (errMsg || 'Download failed — please try again.');
+        var barText = document.getElementById('fiq-dl-bar-text');
+        if (fallbackUrl) {
+          barText.innerHTML = '⚠️ ' + escHtml(errMsg || 'Download failed.') +
+            ' <a href="' + escHtml(fallbackUrl) + '" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:underline;">Download blank form ↗</a>';
+        } else {
+          barText.textContent = '⚠️ ' + (errMsg || 'Download failed — please try again.');
+        }
       }
     });
   });

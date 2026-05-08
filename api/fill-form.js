@@ -171,6 +171,8 @@ module.exports = async function handler(req, res) {
 
   // Resolve URL: curated map > caller-supplied > error
   let resolvedUrl = null;
+  const fallbackUrl = pdfUrl && isAllowedUrl(pdfUrl) ? pdfUrl : null;
+
   if (formName) {
     const curated = lookupPdfUrl(formName);
     if (curated === null) {
@@ -188,17 +190,29 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Server not configured' });
 
-  // ── Fetch PDF ────────────────────────────────────────────────
-  let pdfBytes;
-  try {
-    const upstream = await fetch(resolvedUrl, {
+  // ── Fetch PDF (with fallback to caller-supplied URL on 404) ──────
+  async function fetchPdf(url) {
+    const r = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormIQ/1.0)' },
       redirect: 'follow',
     });
+    return r;
+  }
+
+  let pdfBytes;
+  try {
+    let upstream = await fetchPdf(resolvedUrl);
+
+    // If curated URL is stale (404/410), retry with the caller-supplied URL
+    if (!upstream.ok && (upstream.status === 404 || upstream.status === 410) && fallbackUrl && fallbackUrl !== resolvedUrl) {
+      upstream = await fetchPdf(fallbackUrl);
+      if (upstream.ok) resolvedUrl = fallbackUrl; // update for cache key
+    }
+
     if (!upstream.ok) {
       return res.status(502).json({
-        error: `Could not download the official form (HTTP ${upstream.status}).`,
-        fallback_url: resolvedUrl,
+        error: `Could not download the official form (HTTP ${upstream.status}). The PDF link may be outdated — try downloading the blank form directly.`,
+        fallback_url: fallbackUrl || resolvedUrl,
       });
     }
     pdfBytes = new Uint8Array(await upstream.arrayBuffer());

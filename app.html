@@ -925,7 +925,7 @@
           bar.appendChild(errEl);
         }
       }
-      if (done) done(false, err.message);
+      if (done) done(false, err.message, err.fallbackUrl);
     });
   }
 

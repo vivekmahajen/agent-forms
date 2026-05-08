@@ -101,9 +101,9 @@ const URLS = {
   'fafsa': null,  // online only at studentaid.gov
 
   // ── HHS / CMS ────────────────────────────────────────────────
-  'cms-1500': 'https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS1500.pdf',
-  'cms1500':  'https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS1500.pdf',
-  'ub-04':    'https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS1450.pdf',
+  'cms-1500': 'https://www.cms.gov/files/document/cms-1500-claim-form.pdf',
+  'cms1500':  'https://www.cms.gov/files/document/cms-1500-claim-form.pdf',
+  'ub-04':    'https://www.cms.gov/files/document/ub-04-form.pdf',
 };
 
 // Normalise a form name to the map key
