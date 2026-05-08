@@ -13,7 +13,7 @@
 
   // ── Conversation history & form context ─────────────────────────
   var history = [];
-  var activeFormContext = null;
+  var activeFormContext = null;  // { formName, fields, savedProfile }
 
   // ── Inject CSS ───────────────────────────────────────────────────
   var style = document.createElement('style');
@@ -408,9 +408,9 @@
 
     // Start a guided form-filling session from the app page
     // onDownload(callback) is called when the user clicks the in-chat download button
-    startGuide: function (formName, fields, onDownload) {
-      // Reset state
-      activeFormContext = { formName: formName, fields: fields };
+    startGuide: function (formName, fields, onDownload, savedProfile) {
+      // Reset state — include masked profile so API can pre-fill known fields
+      activeFormContext = { formName: formName, fields: fields, savedProfile: savedProfile || {} };
       downloadCallback = typeof onDownload === 'function' ? onDownload : null;
       history = [];
       messagesEl.innerHTML = '';

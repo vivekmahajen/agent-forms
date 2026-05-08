@@ -51,12 +51,30 @@ function getSortedFields(form, pdfDoc) {
 
 // Ask Claude to extract user answers from chat AND map them directly to PDF field names
 // in a single call — avoids two round-trips and cuts latency roughly in half.
-async function extractAndMapFields(chatHistory, fieldList, pdfFieldInfo, apiKey) {
+async function extractAndMapFields(chatHistory, fieldList, pdfFieldInfo, apiKey, userProfile) {
   const fieldLabels = (fieldList || []).map(f => (typeof f === 'string' ? f : f.field)).filter(Boolean);
   const conversation = (chatHistory || [])
     .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n\n');
+
+  // Build a profile supplement so Claude can fill gaps not covered in the chat
+  let profileNote = '';
+  if (userProfile) {
+    const lines = [];
+    if (userProfile.fullName)       lines.push(`Full name: ${userProfile.fullName}`);
+    if (userProfile.dob)            lines.push(`Date of birth: ${userProfile.dob}`);
+    if (userProfile.ssn)            lines.push(`SSN: ${userProfile.ssn}`);
+    if (userProfile.street)         lines.push(`Address: ${userProfile.street}, ${userProfile.city || ''}, ${userProfile.state || ''} ${userProfile.zip || ''}`);
+    if (userProfile.phone)          lines.push(`Phone: ${userProfile.phone}`);
+    if (userProfile.email)          lines.push(`Email: ${userProfile.email}`);
+    if (userProfile.businessName)   lines.push(`Business name: ${userProfile.businessName}`);
+    if (userProfile.ein)            lines.push(`EIN: ${userProfile.ein}`);
+    if (userProfile.formationState) lines.push(`Formation state: ${userProfile.formationState}`);
+    if (userProfile.formationDate)  lines.push(`Formation date: ${userProfile.formationDate}`);
+    if (userProfile.responsibleParty) lines.push(`Responsible party: ${userProfile.responsibleParty}`);
+    if (lines.length) profileNote = `\n\nSaved profile (use these values to fill gaps not covered in the chat):\n${lines.join('\n')}`;
+  }
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -83,7 +101,7 @@ Rules:
 - Skip PDF fields you cannot confidently match to a user answer`,
       messages: [{
         role: 'user',
-        content: `Human-readable form fields (what the assistant asked about):\n${JSON.stringify(fieldLabels)}\n\nPDF internal fields (map answers to these):\n${JSON.stringify(pdfFieldInfo)}\n\nChat conversation:\n${conversation}\n\nExtract every answer and map directly to the PDF field names.`,
+        content: `Human-readable form fields (what the assistant asked about):\n${JSON.stringify(fieldLabels)}\n\nPDF internal fields (map answers to these):\n${JSON.stringify(pdfFieldInfo)}\n\nChat conversation:\n${conversation}${profileNote}\n\nExtract every answer and map directly to the PDF field names. Use profile values for any fields not covered in the chat.`,
       }],
     }),
   });
@@ -143,7 +161,13 @@ module.exports = async function handler(req, res) {
   const email = await kv.get(`session:${token}`);
   if (!email) return res.status(401).json({ error: 'session_expired' });
 
-  const { pdfUrl, formName, fields, chatHistory, fieldList } = req.body || {};
+  const { pdfUrl, formName, fields, chatHistory, fieldList, useProfile } = req.body || {};
+
+  // Fetch saved profile for server-side use (SSN/EIN never leave the server unmasked)
+  let userProfile = null;
+  if (useProfile) {
+    userProfile = await kv.get(`profile:${email}`).catch(() => null);
+  }
 
   // Resolve URL: curated map > caller-supplied > error
   let resolvedUrl = null;
@@ -218,7 +242,7 @@ module.exports = async function handler(req, res) {
   if (usingChatData) {
     // Single combined call: extract user answers from chat AND map to PDF fields at once
     try {
-      mapping = await extractAndMapFields(chatHistory, fieldList, fieldInfo, apiKey);
+      mapping = await extractAndMapFields(chatHistory, fieldList, fieldInfo, apiKey, userProfile);
     } catch (_) {
       // fall through to sample-data path below
     }

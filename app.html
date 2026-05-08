@@ -183,6 +183,30 @@
     /* ── Full-screen spinner ────────────────────────────────────── */
     #auth-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     #app { display: none; }
+
+    /* ── Profile modal ──────────────────────────────────────────── */
+    #profile-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:8000; align-items:center; justify-content:center; padding:1rem; }
+    #profile-overlay.open { display:flex; }
+    #profile-modal { background:#fff; border-radius:16px; width:100%; max-width:540px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.22); }
+    .pm-header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid #e2e8f0; }
+    .pm-title { font-size:1.05rem; font-weight:700; color:#0F1E3C; margin:0; }
+    .pm-close { background:none; border:none; font-size:1.4rem; color:#94a3b8; cursor:pointer; line-height:1; padding:2px 6px; }
+    .pm-close:hover { color:#475569; }
+    .pm-body { padding:1.25rem 1.5rem; }
+    .pm-section { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin:1.25rem 0 0.6rem; }
+    .pm-section:first-child { margin-top:0; }
+    .pm-row { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem; }
+    .pm-row.full { grid-template-columns:1fr; }
+    .pm-field label { display:block; font-size:0.72rem; font-weight:600; color:#475569; margin-bottom:4px; }
+    .pm-field input { width:100%; box-sizing:border-box; padding:8px 10px; border:1.5px solid #e2e8f0; border-radius:7px; font-family:inherit; font-size:0.83rem; color:#1e293b; outline:none; }
+    .pm-field input:focus { border-color:#0F1E3C; }
+    .pm-field input.masked { color:#94a3b8; font-style:italic; }
+    .pm-consent { font-size:0.72rem; color:#94a3b8; margin:1rem 0 1.25rem; line-height:1.5; }
+    .pm-footer { display:flex; gap:0.75rem; justify-content:flex-end; padding:1rem 1.5rem; border-top:1px solid #e2e8f0; }
+    .pm-save { padding:0.55rem 1.25rem; background:#0F1E3C; color:#fff; border:none; border-radius:7px; font-family:inherit; font-size:0.85rem; font-weight:600; cursor:pointer; }
+    .pm-save:hover { background:#1e3560; }
+    .pm-cancel { padding:0.55rem 1.1rem; background:#f1f5f9; color:#475569; border:none; border-radius:7px; font-family:inherit; font-size:0.85rem; cursor:pointer; }
+    .pm-save-note { font-size:0.72rem; color:#22c55e; align-self:center; display:none; }
   </style>
 </head>
 <body>
@@ -202,10 +226,67 @@
         </div>
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
           <div class="user-info" id="user-info"></div>
+          <button id="btn-profile" style="background:none;border:1.5px solid #2e4470;color:#94a3b8;border-radius:7px;padding:0.4rem 0.85rem;font-family:inherit;font-size:0.78rem;cursor:pointer;" title="My Profile">👤 My Profile</button>
           <button class="btn-signout" id="btn-signout">Sign out</button>
         </div>
       </div>
     </header>
+
+    <!-- Profile modal -->
+    <div id="profile-overlay" role="dialog" aria-modal="true" aria-label="My Profile">
+      <div id="profile-modal">
+        <div class="pm-header">
+          <p class="pm-title">👤 My Profile — Autofill Settings</p>
+          <button class="pm-close" id="pm-close" aria-label="Close">✕</button>
+        </div>
+        <div class="pm-body">
+          <p class="pm-section">Personal</p>
+          <div class="pm-row">
+            <div class="pm-field"><label>Full legal name</label><input id="pf-fullName" type="text" placeholder="Jane Smith" /></div>
+            <div class="pm-field"><label>Date of birth</label><input id="pf-dob" type="text" placeholder="MM/DD/YYYY" /></div>
+          </div>
+          <div class="pm-row">
+            <div class="pm-field"><label>SSN <span style="color:#94a3b8;font-weight:400;">(stored securely, masked after save)</span></label><input id="pf-ssn" type="text" placeholder="XXX-XX-XXXX" autocomplete="off" /></div>
+            <div class="pm-field"><label>Phone</label><input id="pf-phone" type="text" placeholder="(555) 555-0100" /></div>
+          </div>
+          <div class="pm-row full">
+            <div class="pm-field"><label>Email</label><input id="pf-email" type="text" placeholder="you@example.com" /></div>
+          </div>
+
+          <p class="pm-section">Mailing Address</p>
+          <div class="pm-row full">
+            <div class="pm-field"><label>Street address</label><input id="pf-street" type="text" placeholder="123 Main St" /></div>
+          </div>
+          <div class="pm-row">
+            <div class="pm-field"><label>City</label><input id="pf-city" type="text" placeholder="Austin" /></div>
+            <div class="pm-field"><label>State</label><input id="pf-state" type="text" placeholder="TX" maxlength="2" /></div>
+          </div>
+          <div class="pm-row full">
+            <div class="pm-field"><label>ZIP code</label><input id="pf-zip" type="text" placeholder="78701" maxlength="10" /></div>
+          </div>
+
+          <p class="pm-section">Business (optional)</p>
+          <div class="pm-row">
+            <div class="pm-field"><label>Business legal name</label><input id="pf-businessName" type="text" placeholder="Acme Corp LLC" /></div>
+            <div class="pm-field"><label>EIN <span style="color:#94a3b8;font-weight:400;">(masked after save)</span></label><input id="pf-ein" type="text" placeholder="XX-XXXXXXX" autocomplete="off" /></div>
+          </div>
+          <div class="pm-row">
+            <div class="pm-field"><label>Formation state</label><input id="pf-formationState" type="text" placeholder="TX" maxlength="2" /></div>
+            <div class="pm-field"><label>Formation date</label><input id="pf-formationDate" type="text" placeholder="MM/DD/YYYY" /></div>
+          </div>
+          <div class="pm-row full">
+            <div class="pm-field"><label>Responsible party name</label><input id="pf-responsibleParty" type="text" placeholder="Jane Smith" /></div>
+          </div>
+
+          <p class="pm-consent">🔒 Your profile is stored securely and only used to pre-fill forms on your behalf. SSN and EIN are masked after saving and never displayed in full. You can delete your profile at any time.</p>
+        </div>
+        <div class="pm-footer">
+          <span class="pm-save-note" id="pm-save-note">✓ Saved!</span>
+          <button class="pm-cancel" id="pm-cancel">Cancel</button>
+          <button class="pm-save" id="pm-save">Save profile</button>
+        </div>
+      </div>
+    </div>
 
     <main>
       <form id="search-form">
@@ -332,6 +413,72 @@
       window.location.href = '/';
     });
   });
+
+  /* ── Profile modal ───────────────────────────────────────────── */
+  var savedProfile = {};  // masked copy for display and guide context
+
+  var PROFILE_FIELDS = ['fullName','dob','ssn','phone','email','street','city','state','zip',
+                        'businessName','ein','formationState','formationDate','responsibleParty'];
+
+  function openProfileModal() {
+    fetch('/api/profile').then(function(r) { return r.json(); }).then(function(d) {
+      savedProfile = d.profile || {};
+      PROFILE_FIELDS.forEach(function(k) {
+        var el = document.getElementById('pf-' + k);
+        if (el) {
+          el.value = savedProfile[k] || '';
+          el.classList.toggle('masked', !!(savedProfile[k] && (k === 'ssn' || k === 'ein') && savedProfile[k].includes('*')));
+        }
+      });
+      document.getElementById('profile-overlay').classList.add('open');
+    }).catch(function() {
+      document.getElementById('profile-overlay').classList.add('open');
+    });
+  }
+
+  function closeProfileModal() {
+    document.getElementById('profile-overlay').classList.remove('open');
+    document.getElementById('pm-save-note').style.display = 'none';
+  }
+
+  document.getElementById('btn-profile').addEventListener('click', openProfileModal);
+  document.getElementById('pm-close').addEventListener('click', closeProfileModal);
+  document.getElementById('pm-cancel').addEventListener('click', closeProfileModal);
+  document.getElementById('profile-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeProfileModal();
+  });
+
+  document.getElementById('pm-save').addEventListener('click', function() {
+    var payload = {};
+    PROFILE_FIELDS.forEach(function(k) {
+      var el = document.getElementById('pf-' + k);
+      if (el) payload[k] = el.value.trim();
+    });
+    fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      savedProfile = d.profile || {};
+      // Re-render masked values
+      PROFILE_FIELDS.forEach(function(k) {
+        var el = document.getElementById('pf-' + k);
+        if (el && savedProfile[k]) {
+          el.value = savedProfile[k];
+          el.classList.toggle('masked', (k === 'ssn' || k === 'ein') && savedProfile[k].includes('*'));
+        }
+      });
+      var note = document.getElementById('pm-save-note');
+      note.style.display = 'inline';
+      setTimeout(function() { note.style.display = 'none'; }, 3000);
+    });
+  });
+
+  // Load profile silently on page load so guide mode can use it
+  fetch('/api/profile').then(function(r) { return r.json(); }).then(function(d) {
+    savedProfile = d.profile || {};
+  }).catch(function() {});
+
 
   /* ── Search ──────────────────────────────────────────────────── */
   searchForm.addEventListener('submit', function(e) {
@@ -467,7 +614,8 @@
         window.FiqChat.startGuide(
           currentResult.form_name,
           currentResult.instructions,
-          hasPdf ? function (done) { downloadFilledForm(done); } : null
+          hasPdf ? function (done) { downloadFilledForm(done); } : null,
+          savedProfile  // pass masked profile for pre-fill greeting
         );
       }
     });
@@ -656,15 +804,15 @@
   /* ── Build fill-form payload (sample data or chat-extracted answers) ── */
   function buildFillPayload() {
     var base = {
-      formName: currentResult.form_name,
-      pdfUrl:   currentResult.official_pdf_url,
-      fields:   currentResult.sample,   // always included as fallback
+      formName:   currentResult.form_name,
+      pdfUrl:     currentResult.official_pdf_url,
+      fields:     currentResult.sample,   // fallback
+      useProfile: Object.keys(savedProfile).length > 0,
     };
     if (window.FiqChat && window.FiqChat.isGuideMode()) {
       var chatHistory = window.FiqChat.getHistory();
       if (chatHistory.length > 2) {
         base.chatHistory = chatHistory;
-        // Send only field names — instruction text is large and unneeded for extraction
         base.fieldList = currentResult.instructions.map(function(f) { return f.field; });
       }
     }

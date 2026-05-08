@@ -39,6 +39,27 @@ function buildSystemPrompt(formContext) {
     })
     .join('\n');
 
+  // Build profile pre-fill block if the user has saved data
+  let profileBlock = '';
+  const p = formContext.savedProfile;
+  if (p && Object.keys(p).length) {
+    const lines = [];
+    if (p.fullName)       lines.push(`Full name: ${p.fullName}`);
+    if (p.dob)            lines.push(`Date of birth: ${p.dob}`);
+    if (p.ssn)            lines.push(`SSN: ${p.ssn} (masked — last 4 digits shown)`);
+    if (p.street)         lines.push(`Address: ${p.street}, ${p.city || ''}, ${p.state || ''} ${p.zip || ''}`);
+    if (p.phone)          lines.push(`Phone: ${p.phone}`);
+    if (p.email)          lines.push(`Email: ${p.email}`);
+    if (p.businessName)   lines.push(`Business name: ${p.businessName}`);
+    if (p.ein)            lines.push(`EIN: ${p.ein} (masked)`);
+    if (p.formationState) lines.push(`Formation state: ${p.formationState}`);
+    if (p.formationDate)  lines.push(`Formation date: ${p.formationDate}`);
+    if (p.responsibleParty) lines.push(`Responsible party: ${p.responsibleParty}`);
+    if (lines.length) {
+      profileBlock = `\n\n### Pre-filled from saved profile\nThe user has a saved profile. At the start of the session, tell them: "I've pre-filled ${lines.length} fields from your saved profile. Please confirm they're correct or let me know what's changed."\nThen list these fields and ask the user to confirm or update each one before moving on:\n${lines.join('\n')}\nFor fields like address that may have changed, explicitly ask: "Your saved address is [X] — is this still current?"`;
+    }
+  }
+
   return BASE_SYSTEM_PROMPT + `
 
 ---
@@ -60,7 +81,7 @@ The user has clicked "Guide me through this" for **${formContext.formName}**. Yo
 10. **Never use legal jargon** without immediately explaining it in parentheses.
 
 ### Form fields to guide through (in order)
-${fieldList}`;
+${fieldList}${profileBlock}`;
 }
 
 module.exports = async function handler(req, res) {
