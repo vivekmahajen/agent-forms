@@ -486,22 +486,10 @@
       '</div>';
     }).join('');
 
-    // Version mismatch warning
-    var versionWarn = '';
-    if (data.versionInfo && data.versionInfo.isMismatch) {
-      versionWarn =
-        '<div style="margin-bottom:8px;padding:6px 9px;border-radius:7px;background:#fffbeb;border:1px solid #fde68a;font-size:0.73rem;color:#92400e;line-height:1.45;">' +
-          '⚠️ Version mismatch: your uploaded document is Rev. ' + escHtml(data.versionInfo.uploadedRev) +
-          ', but the current version is Rev. ' + escHtml(data.versionInfo.currentRev) +
-          '. Some fields may have changed — double-check before applying.' +
-        '</div>';
-    }
-
     bubble.innerHTML =
       '<div class="fiq-extract-card">' +
         '<p class="fiq-extract-title">📄 ' + escHtml(docType) + '</p>' +
         '<p class="fiq-extract-subtitle">Review and edit the extracted values, then click Apply.</p>' +
-        versionWarn +
         rows +
         '<div class="fiq-extract-actions">' +
           '<button class="fiq-extract-apply">✓ Apply these values</button>' +

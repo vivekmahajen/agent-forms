@@ -6,9 +6,8 @@
     "api/fill-form.js":  { "maxDuration": 60 },
     "api/lookup.js":     { "maxDuration": 60 },
     "api/chat.js":       { "maxDuration": 30 },
-    "api/next-steps.js":          { "maxDuration": 30 },
-    "api/extract-document.js":    { "maxDuration": 60 },
-    "api/check-form-version.js":  { "maxDuration": 30 }
+    "api/next-steps.js":       { "maxDuration": 30 },
+    "api/extract-document.js": { "maxDuration": 60 }
   },
   "rewrites": [
     { "source": "/app",   "destination": "/app.html" },

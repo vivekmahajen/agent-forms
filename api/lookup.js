@@ -1,6 +1,5 @@
 const { createKV, getSessionToken, isAdmin, isTrialExpired, getTodayKey, DAILY_LIMIT } = require('./_utils');
 const { lookupPdfUrl } = require('./_form-urls');
-const { lookupVersion } = require('./_form-versions');
 const kv = createKV();
 
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
@@ -156,25 +155,17 @@ module.exports = async function handler(req, res) {
 
     const data = await upstream.json();
 
-    // Inject curated PDF URL and version info
+    // Inject a verified PDF URL, overriding Claude's potentially stale suggestion
     try {
       const textBlock = (data.content || []).find(b => b.type === 'text');
       if (textBlock) {
         const parsed = JSON.parse(textBlock.text);
         if (parsed.found) {
-          const curatedUrl = lookupPdfUrl(formName) ?? lookupPdfUrl(parsed.form_name);
-          if (typeof curatedUrl !== 'undefined') parsed.official_pdf_url = curatedUrl;
-
-          const verInfo = lookupVersion(parsed.form_name || formName);
-          if (verInfo) {
-            parsed.versionInfo = {
-              rev:      verInfo.rev,
-              expires:  verInfo.expires,
-              upcoming: verInfo.upcoming,
-              source:   'curated',
-            };
+          const curated = lookupPdfUrl(formName) ?? lookupPdfUrl(parsed.form_name);
+          if (typeof curated !== 'undefined') {
+            parsed.official_pdf_url = curated;
+            textBlock.text = JSON.stringify(parsed);
           }
-          textBlock.text = JSON.stringify(parsed);
         }
       }
     } catch (_) { /* non-critical */ }
