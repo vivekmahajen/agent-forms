@@ -121,14 +121,10 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const LANG_FULL = { es:'Spanish', pt:'Portuguese', fr:'French', zh:'Mandarin Chinese', vi:'Vietnamese', tl:'Tagalog', ko:'Korean', ar:'Arabic' };
-
-  const { formName, lang } = req.body || {};
+  const { formName } = req.body || {};
   if (!formName || typeof formName !== 'string') {
     return res.status(400).json({ error: 'formName is required' });
   }
-
-  const langName = lang && lang !== 'en' ? LANG_FULL[lang] : null;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Server not configured' });
@@ -145,7 +141,7 @@ module.exports = async function handler(req, res) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
         system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: `Form name: ${formName}${langName ? `\n\nFor each entry in the "instructions" array, also include a "translated_label" field — the field name translated into ${langName} using jurisdiction-appropriate legal and tax terminology (not word-for-word literal translation).` : ''}` }],
+        messages: [{ role: 'user', content: `Form name: ${formName}` }],
       }),
     });
 

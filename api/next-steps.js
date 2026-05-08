@@ -40,16 +40,13 @@ module.exports = async function handler(req, res) {
   const email = await kv.get(`session:${token}`);
   if (!email) return res.status(401).json({ error: 'session_expired' });
 
-  const LANG_FULL = { es:'Spanish', pt:'Portuguese', fr:'French', zh:'Mandarin Chinese', vi:'Vietnamese', tl:'Tagalog', ko:'Korean', ar:'Arabic' };
-
-  const { formName, state, lang } = req.body || {};
+  const { formName, state } = req.body || {};
   if (!formName || typeof formName !== 'string') {
     return res.status(400).json({ error: 'formName is required' });
   }
 
-  const langName = lang && lang !== 'en' ? LANG_FULL[lang] : null;
-  // Cache per form+state+lang for 24 hours
-  const cacheKey = `nextsteps:${formName.toLowerCase().trim()}:${(state || '').toLowerCase()}:${lang || 'en'}`;
+  // Cache per form+state for 24 hours — next-steps don't change often
+  const cacheKey = `nextsteps:${formName.toLowerCase().trim()}:${(state || '').toLowerCase()}`;
   try {
     const cached = await kv.get(cacheKey);
     if (cached) return res.status(200).json({ steps: cached });
@@ -72,7 +69,7 @@ module.exports = async function handler(req, res) {
         system: SYSTEM_PROMPT,
         messages: [{
           role: 'user',
-          content: `Form: ${formName}${state ? `\nUser's state: ${state}` : ''}\n\nGenerate the post-completion next-steps checklist.${langName ? `\n\nIMPORTANT: Respond entirely in ${langName}. Translate all "title" and "detail" fields into ${langName}. Keep proper nouns unchanged (form numbers like "W-9", agency names like "IRS", dollar amounts, URLs).` : ''}`,
+          content: `Form: ${formName}${state ? `\nUser's state: ${state}` : ''}\n\nGenerate the post-completion next-steps checklist.`,
         }],
       }),
     });

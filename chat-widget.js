@@ -222,14 +222,6 @@
   document.body.appendChild(btn);
 
   // Panel
-  // Small i18n for widget static strings
-  var WIDGET_LANG = localStorage.getItem('fiq_lang') || 'en';
-  var WIDGET_T = {
-    placeholder: { en:'Ask anything about forms…', es:'Pregunta sobre cualquier formulario…', pt:'Pergunte sobre qualquer formulário…', fr:'Posez des questions sur tout formulaire…', zh:'关于表格有什么问题？', vi:'Hỏi bất cứ điều gì về mẫu đơn…', tl:'Magtanong tungkol sa anumang form…', ko:'양식에 대해 무엇이든 물어보세요…', ar:'اسأل عن أي نموذج…' },
-    uploadLabel: { en:'📎 Upload a prior return, ID, or confirmation letter to pre-fill fields', es:'📎 Sube un documento previo para prellenar los campos', pt:'📎 Envie um documento anterior para pré-preencher os campos', fr:'📎 Chargez un document pour pré-remplir les champs', zh:'📎 上传文件以预填字段', vi:'📎 Tải tài liệu lên để tự động điền các trường', tl:'📎 Mag-upload ng dokumento upang i-pre-fill ang mga field', ko:'📎 문서를 업로드하여 필드를 미리 채우세요', ar:'📎 ارفع مستنداً لملء الحقول مسبقاً' },
-  };
-  function wt(key) { return (WIDGET_T[key] || {})[WIDGET_LANG] || (WIDGET_T[key] || {})['en'] || key; }
-
   var panel = document.createElement('div');
   panel.id = 'fiq-panel';
   panel.setAttribute('role', 'dialog');
@@ -255,12 +247,12 @@
         '<button id="fiq-dl-btn" type="button">📥 Download filled PDF</button>' +
       '</div>' +
       '<div id="fiq-upload-bar">' +
-        '<label id="fiq-upload-label" for="fiq-file-input">' + wt('uploadLabel') + '</label>' +
+        '<label id="fiq-upload-label" for="fiq-file-input">📎 Upload a prior return, ID, or confirmation letter to pre-fill fields</label>' +
         '<button id="fiq-upload-btn" type="button">Upload</button>' +
         '<input id="fiq-file-input" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" />' +
       '</div>' +
       '<form id="fiq-form">' +
-        '<textarea id="fiq-input" rows="1" placeholder="' + wt('placeholder') + '" aria-label="Chat message"></textarea>' +
+        '<textarea id="fiq-input" rows="1" placeholder="Ask anything about forms…" aria-label="Chat message"></textarea>' +
         '<button type="submit" id="fiq-send" aria-label="Send">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="#FAFAF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' +
         '</button>' +
@@ -647,16 +639,9 @@
 
     // Start a guided form-filling session from the app page
     // onDownload(callback) is called when the user clicks the in-chat download button
-    startGuide: function (formName, fields, onDownload, savedProfile, lang) {
-      // Update widget language if changed
-      if (lang && lang !== WIDGET_LANG) {
-        WIDGET_LANG = lang;
-        if (inputEl) inputEl.placeholder = wt('placeholder');
-        var ul = document.getElementById('fiq-upload-label');
-        if (ul) ul.textContent = wt('uploadLabel');
-      }
+    startGuide: function (formName, fields, onDownload, savedProfile) {
       // Reset state — include masked profile so API can pre-fill known fields
-      activeFormContext = { formName: formName, fields: fields, savedProfile: savedProfile || {}, lang: lang || 'en' };
+      activeFormContext = { formName: formName, fields: fields, savedProfile: savedProfile || {} };
       downloadCallback = typeof onDownload === 'function' ? onDownload : null;
       history = [];
       messagesEl.innerHTML = '';
