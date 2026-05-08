@@ -138,6 +138,56 @@
     }
     #fiq-dl-btn:disabled { background: #94a3b8; cursor: not-allowed; }
     #fiq-dl-btn:hover:not(:disabled) { background: #6d28d9; }
+
+    /* Upload bar */
+    #fiq-upload-bar {
+      display: none; align-items: center; gap: 8px; margin-bottom: 8px;
+      padding: 7px 10px; background: #f0f9ff; border: 1.5px solid #bae6fd;
+      border-radius: 8px;
+    }
+    #fiq-upload-bar.visible { display: flex; }
+    #fiq-upload-label {
+      flex: 1; font-size: 0.72rem; color: #0369a1; line-height: 1.35; cursor: pointer;
+    }
+    #fiq-upload-btn {
+      padding: 5px 11px; font-family: inherit; font-size: 0.75rem; font-weight: 700;
+      background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    #fiq-upload-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    #fiq-upload-btn:hover:not(:disabled) { background: #0369a1; }
+    #fiq-file-input { display: none; }
+
+    /* Extraction confirmation card */
+    .fiq-extract-card {
+      background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px;
+      padding: 10px 12px; margin: 4px 0; font-size: 0.78rem;
+    }
+    .fiq-extract-title { font-weight: 700; color: #0F1E3C; margin: 0 0 6px; font-size: 0.82rem; }
+    .fiq-extract-subtitle { color: #64748b; margin: 0 0 8px; font-size: 0.72rem; }
+    .fiq-extract-row { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+    .fiq-extract-row:last-of-type { border-bottom: none; }
+    .fiq-extract-field { flex: 1; color: #475569; font-size: 0.72rem; padding-top: 1px; }
+    .fiq-extract-val { flex: 1.4; }
+    .fiq-extract-input {
+      width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.75rem;
+      border: 1.5px solid #e2e8f0; border-radius: 5px; padding: 3px 6px; color: #1e293b;
+    }
+    .fiq-extract-input.amber { border-color: #f59e0b; background: #fffbeb; }
+    .fiq-conf-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+    .fiq-conf-high   { background: #22c55e; }
+    .fiq-conf-medium { background: #f59e0b; }
+    .fiq-conf-low    { background: #ef4444; }
+    .fiq-extract-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .fiq-extract-apply {
+      flex: 1; padding: 6px; background: #0F1E3C; color: #fff; border: none;
+      border-radius: 6px; font-family: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer;
+    }
+    .fiq-extract-apply:hover { background: #1e3560; }
+    .fiq-extract-skip {
+      padding: 6px 10px; background: #f1f5f9; color: #64748b; border: none;
+      border-radius: 6px; font-family: inherit; font-size: 0.75rem; cursor: pointer;
+    }
     #fiq-form { display: flex; gap: 8px; align-items: flex-end; }
     #fiq-input {
       flex: 1; resize: none; border: 1.5px solid #e2e8f0; border-radius: 10px;
@@ -196,6 +246,11 @@
         '<span id="fiq-dl-bar-text">Ready to download your filled PDF?</span>' +
         '<button id="fiq-dl-btn" type="button">📥 Download filled PDF</button>' +
       '</div>' +
+      '<div id="fiq-upload-bar">' +
+        '<label id="fiq-upload-label" for="fiq-file-input">📎 Upload a prior return, ID, or confirmation letter to pre-fill fields</label>' +
+        '<button id="fiq-upload-btn" type="button">Upload</button>' +
+        '<input id="fiq-file-input" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" />' +
+      '</div>' +
       '<form id="fiq-form">' +
         '<textarea id="fiq-input" rows="1" placeholder="Ask anything about forms…" aria-label="Chat message"></textarea>' +
         '<button type="submit" id="fiq-send" aria-label="Send">' +
@@ -214,9 +269,13 @@
   var unreadDot     = document.getElementById('fiq-unread');
   var dlBar         = document.getElementById('fiq-dl-bar');
   var dlBtn         = document.getElementById('fiq-dl-btn');
+  var uploadBar     = document.getElementById('fiq-upload-bar');
+  var uploadBtn     = document.getElementById('fiq-upload-btn');
+  var fileInput     = document.getElementById('fiq-file-input');
   var isOpen        = false;
   var isStreaming   = false;
   var downloadCallback = null;
+  var privacyAccepted  = false;
 
   dlBtn.addEventListener('click', function () {
     if (typeof downloadCallback !== 'function') return;
@@ -244,6 +303,160 @@
       }
     });
   });
+
+  // ── Document upload ──────────────────────────────────────────────
+  uploadBtn.addEventListener('click', function () {
+    if (!privacyAccepted) {
+      // Show privacy notice as an assistant message, then open picker after confirmation
+      appendPrivacyNotice();
+    } else {
+      fileInput.click();
+    }
+  });
+
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileInput.value = ''; // reset so same file can be re-selected
+    processUpload(file);
+  });
+
+  function appendPrivacyNotice() {
+    var wrap = document.createElement('div');
+    wrap.className = 'fiq-msg assistant';
+    wrap.innerHTML =
+      '<div class="fiq-msg-icon">📋</div>' +
+      '<div class="fiq-bubble">' +
+        '<strong>Before you upload</strong><br><br>' +
+        '🔒 FormIQ processes your document in real-time using AI and <strong>never stores it</strong>. ' +
+        'Your file is sent securely, used only to extract relevant field values, and immediately discarded after processing.<br><br>' +
+        '<button class="fiq-privacy-ok" style="padding:6px 14px;background:#0F1E3C;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:0.78rem;font-weight:700;cursor:pointer;margin-right:6px;">I understand — Upload</button>' +
+        '<button class="fiq-privacy-cancel" style="padding:6px 10px;background:#f1f5f9;color:#475569;border:none;border-radius:6px;font-family:inherit;font-size:0.78rem;cursor:pointer;">Cancel</button>' +
+      '</div>';
+    messagesEl.appendChild(wrap);
+    scrollBottom();
+
+    wrap.querySelector('.fiq-privacy-ok').addEventListener('click', function () {
+      privacyAccepted = true;
+      wrap.querySelector('.fiq-privacy-ok').disabled = true;
+      wrap.querySelector('.fiq-privacy-cancel').disabled = true;
+      fileInput.click();
+    });
+    wrap.querySelector('.fiq-privacy-cancel').addEventListener('click', function () {
+      messagesEl.removeChild(wrap);
+    });
+  }
+
+  function processUpload(file) {
+    var MAX_BYTES = 4.5 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      appendMessage('assistant', '⚠️ That file is too large (max 4.5 MB). Please compress it or upload a smaller version.');
+      return;
+    }
+
+    var mimeType = file.type || '';
+    var supported = ['application/pdf','image/jpeg','image/jpg','image/png','image/webp'];
+    if (!supported.includes(mimeType)) {
+      var ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'docx' || ext === 'doc') {
+        appendMessage('assistant', '⚠️ Word documents (.docx) are not supported yet. Please save your document as a PDF and upload that instead.');
+      } else {
+        appendMessage('assistant', '⚠️ Unsupported file type. Please upload a PDF, JPG, PNG, or WebP file.');
+      }
+      return;
+    }
+
+    // Show loading bubble
+    var bubble = appendStreamingBubble();
+    bubble.innerHTML = '<em style="color:#64748b;">Reading ' + escHtml(file.name) + '…</em>';
+    scrollBottom();
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var base64 = e.target.result.split(',')[1]; // strip data:mime;base64,
+      var formName = activeFormContext ? activeFormContext.formName : '';
+
+      fetch('/api/extract-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileData: base64, fileType: mimeType, fileName: file.name, targetForm: formName }),
+      })
+      .then(function (res) { return res.json(); })
+      .then(function (d) {
+        if (d.error) {
+          bubble.textContent = '⚠️ ' + d.error;
+          return;
+        }
+        renderExtractionCard(bubble, d, formName);
+      })
+      .catch(function () {
+        bubble.textContent = '⚠️ Upload failed — please try again.';
+      });
+    };
+    reader.onerror = function () {
+      bubble.textContent = '⚠️ Could not read the file. Please try again.';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderExtractionCard(bubble, data, formName) {
+    var fields = (data.fields || []);
+    var docType = data.docType || 'Document';
+
+    if (!fields.length) {
+      bubble.textContent = 'I couldn\'t find any relevant fields in this document for ' + (formName || 'this form') + '.';
+      return;
+    }
+
+    var rows = fields.map(function (f, i) {
+      var isAmber = f.confidence === 'medium' || f.confidence === 'low';
+      var dotClass = 'fiq-conf-' + (f.confidence || 'high');
+      var note = f.note ? ' title="' + escHtml(f.note) + '"' : '';
+      return '<div class="fiq-extract-row">' +
+        '<span class="fiq-conf-dot ' + dotClass + '"' + note + '></span>' +
+        '<span class="fiq-extract-field">' + escHtml(f.field) + '</span>' +
+        '<span class="fiq-extract-val">' +
+          '<input class="fiq-extract-input' + (isAmber ? ' amber' : '') + '" data-field="' + escHtml(f.field) + '" value="' + escHtml(f.value || '') + '" />' +
+        '</span>' +
+      '</div>';
+    }).join('');
+
+    bubble.innerHTML =
+      '<div class="fiq-extract-card">' +
+        '<p class="fiq-extract-title">📄 ' + escHtml(docType) + '</p>' +
+        '<p class="fiq-extract-subtitle">Review and edit the extracted values, then click Apply.</p>' +
+        rows +
+        '<div class="fiq-extract-actions">' +
+          '<button class="fiq-extract-apply">✓ Apply these values</button>' +
+          '<button class="fiq-extract-skip">Skip</button>' +
+        '</div>' +
+      '</div>';
+
+    bubble.querySelector('.fiq-extract-skip').addEventListener('click', function () {
+      bubble.innerHTML = '<em style="color:#94a3b8;">Extraction skipped.</em>';
+    });
+
+    bubble.querySelector('.fiq-extract-apply').addEventListener('click', function () {
+      var inputs = bubble.querySelectorAll('.fiq-extract-input');
+      var confirmed = [];
+      inputs.forEach(function (inp) {
+        var val = inp.value.trim();
+        if (val) confirmed.push(inp.dataset.field + ': ' + val);
+      });
+
+      if (!confirmed.length) { bubble.querySelector('.fiq-extract-apply').textContent = 'No values to apply.'; return; }
+
+      // Inject into chat history as a user message so Claude and fill-form see the values
+      var msg = 'I have the following pre-filled values from my uploaded document (' + escHtml(docType) + '). Please use these and confirm each one:\n' + confirmed.join('\n');
+      history.push({ role: 'user', content: msg });
+
+      bubble.innerHTML = '✅ Applied ' + confirmed.length + ' field' + (confirmed.length > 1 ? 's' : '') + ' from ' + escHtml(docType) + '. Claude will now confirm them with you.';
+      scrollBottom();
+
+      // Trigger Claude to acknowledge and confirm
+      sendMessage('Please confirm you have the extracted values and continue guiding me from where we left off.');
+    });
+  }
 
   // ── Suggestions ──────────────────────────────────────────────────
   var SUGGESTIONS = [
@@ -433,6 +646,9 @@
         dlBar.classList.remove('visible');
       }
 
+      // Show upload bar so user can pre-fill from existing documents
+      if (uploadBar) uploadBar.classList.add('visible');
+
       // Update header to show guide mode
       var nameEl = document.getElementById('fiq-header-name');
       var statusEl = document.getElementById('fiq-status-text');
@@ -449,6 +665,7 @@
       activeFormContext = null;
       downloadCallback = null;
       dlBar.classList.remove('visible');
+      if (uploadBar) uploadBar.classList.remove('visible');
       var nameEl = document.getElementById('fiq-header-name');
       var statusEl = document.getElementById('fiq-status-text');
       if (nameEl) nameEl.textContent = 'FormIQ Assistant';
