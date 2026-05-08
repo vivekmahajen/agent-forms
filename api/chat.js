@@ -1,6 +1,11 @@
 const { createKV, getSessionToken } = require('./_utils');
 const kv = createKV();
 
+const LANG_FULL = {
+  es: 'Spanish', pt: 'Portuguese', fr: 'French', zh: 'Mandarin Chinese',
+  vi: 'Vietnamese', tl: 'Tagalog', ko: 'Korean', ar: 'Arabic',
+};
+
 const BASE_SYSTEM_PROMPT = `You are FormIQ Assistant — a friendly, expert support agent for FormIQ, a service that helps people understand and complete official forms.
 
 You have deep expertise in:
@@ -60,6 +65,13 @@ function buildSystemPrompt(formContext) {
     }
   }
 
+  const lang = formContext.lang;
+  const langName = lang && lang !== 'en' ? LANG_FULL[lang] : null;
+  const langBlock = langName ? `
+
+### Language
+Conduct this ENTIRE guided session in **${langName}**. This includes all greetings, questions, explanations, confirmations, and progress recaps. The form fields must stay in English (required by the issuing agency), but explain each field name and instruction in ${langName}. Use jurisdiction-appropriate terminology — for example, "RFC" for Tax ID in Mexican context, "NIF"/"NIE" in Spain, "CPF"/"CNPJ" in Brazil, "NAS" in French Canada — rather than literal translations. In your FIRST message, include a brief disclaimer in ${langName} that this guidance is AI-generated and does not constitute legal or tax advice.` : '';
+
   return BASE_SYSTEM_PROMPT + `
 
 ---
@@ -81,7 +93,7 @@ The user has clicked "Guide me through this" for **${formContext.formName}**. Yo
 10. **Never use legal jargon** without immediately explaining it in parentheses.
 
 ### Form fields to guide through (in order)
-${fieldList}${profileBlock}`;
+${fieldList}${profileBlock}${langBlock}`;
 }
 
 module.exports = async function handler(req, res) {

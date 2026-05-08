@@ -2,6 +2,11 @@ const { createKV, getSessionToken, isAdmin, isTrialExpired, getTodayKey, DAILY_L
 const { lookupPdfUrl } = require('./_form-urls');
 const kv = createKV();
 
+const LANG_FULL = {
+  es: 'Spanish', pt: 'Portuguese', fr: 'French', zh: 'Mandarin Chinese',
+  vi: 'Vietnamese', tl: 'Tagalog', ko: 'Korean', ar: 'Arabic',
+};
+
 const SYSTEM_PROMPT = `You are FormIQ, an expert assistant specialising in explaining official forms — government, tax, immigration, HR, medical, and legal.
 
 When given a form name, return a structured JSON object with EXACTLY this shape:
@@ -120,10 +125,11 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const { formName } = req.body || {};
+  const { formName, lang } = req.body || {};
   if (!formName || typeof formName !== 'string') {
     return res.status(400).json({ error: 'formName is required' });
   }
+  const langName = lang && lang !== 'en' ? LANG_FULL[lang] : null;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Server not configured' });
@@ -140,7 +146,7 @@ module.exports = async function handler(req, res) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
         system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: `Form name: ${formName}` }],
+        messages: [{ role: 'user', content: `Form name: ${formName}${langName ? `\n\nFor each entry in "instructions" and "sample", add a "translated_label" field containing the field label in ${langName}. Use jurisdiction-appropriate terminology (e.g., "RFC" for Tax ID in Mexican Spanish context, "NIF"/"NIE" in Spain, "CPF"/"CNPJ" in Brazil, "NAS" in French Canada). The "field" value stays in English; only "translated_label" is in ${langName}.` : ''}` }],
       }),
     });
 

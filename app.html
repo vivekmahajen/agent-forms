@@ -208,6 +208,22 @@
     #auth-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     #app { display: none; }
 
+    /* ── Language picker ─────────────────────────────────────────── */
+    .btn-lang-selector { background: none; border: 1.5px solid #2e4470; border-radius: 6px; padding: 0.3rem 0.65rem; font-family: inherit; font-size: 0.78rem; color: #94a3b8; cursor: pointer; white-space: nowrap; }
+    .btn-lang-selector:hover { border-color: #F59E0B; color: #F59E0B; }
+    #lang-overlay { display: none; position: fixed; inset: 0; background: rgba(15,30,60,0.55); z-index: 9500; align-items: center; justify-content: center; padding: 1rem; }
+    #lang-overlay.open { display: flex; }
+    #lang-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; padding: 1.75rem; box-shadow: 0 24px 64px rgba(0,0,0,0.22); }
+    .lang-modal-title { font-family: 'DM Serif Display', serif; font-size: 1.2rem; color: #0F1E3C; margin: 0 0 0.3rem; }
+    .lang-modal-sub { font-size: 0.82rem; color: #64748b; margin: 0 0 1.25rem; line-height: 1.5; }
+    .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .lang-btn { padding: 0.65rem 0.875rem; font-family: inherit; font-size: 0.82rem; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 1px; transition: border-color 0.15s, background 0.15s; }
+    .lang-btn:hover { border-color: #0F1E3C; background: #f1f5f9; }
+    .lang-btn.selected { border-color: #F59E0B; background: #fffbeb; }
+    .lang-btn-native { font-weight: 600; color: #0F1E3C; }
+    .lang-btn-eng { font-size: 0.72rem; color: #94a3b8; }
+    .translated-label { font-size: 0.72rem; color: #6d28d9; font-weight: 500; margin-top: 1px; display: block; }
+
     /* ── Profile modal ──────────────────────────────────────────── */
     #profile-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:8000; align-items:center; justify-content:center; padding:1rem; }
     #profile-overlay.open { display:flex; }
@@ -248,8 +264,9 @@
           <span aria-hidden="true">📋</span>
           <span class="logo-text">FormIQ</span>
         </div>
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:0.625rem;flex-wrap:wrap;">
           <div class="user-info" id="user-info"></div>
+          <button class="btn-lang-selector" id="btn-lang">🌐 EN</button>
           <button id="btn-profile" style="background:none;border:1.5px solid #2e4470;color:#94a3b8;border-radius:7px;padding:0.4rem 0.85rem;font-family:inherit;font-size:0.78rem;cursor:pointer;" title="My Profile">👤 My Profile</button>
           <button class="btn-signout" id="btn-signout">Sign out</button>
         </div>
@@ -314,7 +331,7 @@
 
     <main>
       <form id="search-form">
-        <label class="search-label" for="search-input">What form do you need help with?</label>
+        <label class="search-label" id="search-label" for="search-input">What form do you need help with?</label>
         <div class="search-row">
           <input class="search-input" id="search-input" type="text" placeholder="Enter a form name, e.g. W-2, I-9, DS-160…" autocomplete="off" />
           <button class="btn-lookup" id="btn-lookup" type="submit">Look Up Form</button>
@@ -329,6 +346,15 @@
     <footer>
       <p>FormIQ provides AI-generated guidance for informational purposes only. Always verify form instructions with the issuing agency. Not legal or tax advice.</p>
     </footer>
+  </div>
+
+  <!-- Language picker overlay -->
+  <div id="lang-overlay" role="dialog" aria-modal="true" aria-label="Select language">
+    <div id="lang-modal">
+      <h2 class="lang-modal-title">🌐 Select your language</h2>
+      <p class="lang-modal-sub">We'll guide you through forms in your language.<br>Te ayudaremos en tu idioma. / Nous vous aiderons dans votre langue.</p>
+      <div class="lang-grid" id="lang-grid"></div>
+    </div>
   </div>
 
   <!-- Upgrade Modal -->
@@ -350,6 +376,151 @@
   </div>
 
 <script>
+  /* ── Language system ─────────────────────────────────────────── */
+  var SUPPORTED_LANGS = [
+    { code: 'en', name: 'English',    native: 'English'    },
+    { code: 'es', name: 'Spanish',    native: 'Español'    },
+    { code: 'pt', name: 'Portuguese', native: 'Português'  },
+    { code: 'fr', name: 'French',     native: 'Français'   },
+    { code: 'zh', name: 'Mandarin',   native: '中文'        },
+    { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+    { code: 'tl', name: 'Tagalog',    native: 'Filipino'   },
+    { code: 'ko', name: 'Korean',     native: '한국어'      },
+    { code: 'ar', name: 'Arabic',     native: 'العربية'    },
+  ];
+
+  var T = {
+    searchLabel: {
+      en: 'What form do you need help with?',
+      es: '¿Con qué formulario necesitas ayuda?',
+      pt: 'Com qual formulário você precisa de ajuda?',
+      fr: 'Quel formulaire souhaitez-vous remplir ?',
+      zh: '您需要哪个表格的帮助？',
+      vi: 'Bạn cần giúp đỡ về biểu mẫu nào?',
+      tl: 'Anong form ang kailangan mo ng tulong?',
+      ko: '어떤 양식에 도움이 필요하신가요?',
+      ar: 'ما النموذج الذي تحتاج مساعدة فيه؟',
+    },
+    lookupBtn: {
+      en: 'Look Up Form',
+      es: 'Buscar formulario',
+      pt: 'Buscar formulário',
+      fr: 'Rechercher',
+      zh: '查找表格',
+      vi: 'Tra cứu',
+      tl: 'Hanapin',
+      ko: '양식 조회',
+      ar: 'بحث',
+    },
+    tabOverview: {
+      en: 'Overview', es: 'Resumen', pt: 'Visão geral', fr: 'Aperçu',
+      zh: '概览', vi: 'Tổng quan', tl: 'Buod', ko: '개요', ar: 'نظرة عامة',
+    },
+    tabInstructions: {
+      en: 'Instructions', es: 'Instrucciones', pt: 'Instruções', fr: 'Instructions',
+      zh: '填写说明', vi: 'Hướng dẫn', tl: 'Mga Tagubilin', ko: '작성 안내', ar: 'التعليمات',
+    },
+    tabSample: {
+      en: 'Filled Sample', es: 'Ejemplo completado', pt: 'Exemplo preenchido', fr: 'Exemple complété',
+      zh: '示例填写', vi: 'Mẫu điền sẵn', tl: 'Huwaran', ko: '작성 예시', ar: 'نموذج مكتمل',
+    },
+    tabNextSteps: {
+      en: '✅ Next Steps', es: '✅ Próximos pasos', pt: '✅ Próximos passos', fr: '✅ Étapes suivantes',
+      zh: '✅ 后续步骤', vi: '✅ Các bước tiếp theo', tl: '✅ Susunod na hakbang', ko: '✅ 다음 단계', ar: '✅ الخطوات التالية',
+    },
+    guideTitle: {
+      en: 'Not sure how to fill this out?',
+      es: '¿No sabes cómo completarlo?',
+      pt: 'Não sabe como preencher?',
+      fr: 'Vous ne savez pas comment remplir ce formulaire ?',
+      zh: '不确定如何填写？',
+      vi: 'Không chắc cách điền?',
+      tl: 'Hindi sigurado kung paano punan?',
+      ko: '작성 방법이 궁금하신가요?',
+      ar: 'غير متأكد من كيفية تعبئة النموذج؟',
+    },
+    guideSub: {
+      en: 'Let our AI walk you through every field, one step at a time.',
+      es: 'Deja que nuestra IA te guíe campo por campo, paso a paso.',
+      pt: 'Deixe nossa IA guiá-lo campo a campo, passo a passo.',
+      fr: 'Laissez notre IA vous guider champ par champ, étape par étape.',
+      zh: '让我们的AI一步步引导您填写每个字段。',
+      vi: 'Để AI của chúng tôi hướng dẫn bạn từng bước một.',
+      tl: 'Hayaan ang aming AI na gabayan ka sa bawat field, hakbang-hakbang.',
+      ko: 'AI가 모든 필드를 단계적으로 안내해 드립니다.',
+      ar: 'دع الذكاء الاصطناعي يرشدك خطوة بخطوة.',
+    },
+    guideBtn: {
+      en: 'Guide me through this →',
+      es: 'Guíame paso a paso →',
+      pt: 'Me guie passo a passo →',
+      fr: 'Guidez-moi étape par étape →',
+      zh: '一步步引导我 →',
+      vi: 'Hướng dẫn tôi →',
+      tl: 'Gabayan ako →',
+      ko: '단계별 안내 받기 →',
+      ar: 'أرشدني خطوة بخطوة →',
+    },
+  };
+
+  var lang = (function() {
+    try { return localStorage.getItem('fiq_lang') || 'en'; } catch { return 'en'; }
+  })();
+
+  function t(key) {
+    var map = T[key];
+    if (!map) return key;
+    return map[lang] || map['en'] || key;
+  }
+
+  function applyLang() {
+    var btnLangEl = document.getElementById('btn-lang');
+    var searchLabelEl = document.getElementById('search-label');
+    var btnLookupEl = document.getElementById('btn-lookup');
+    var entry = SUPPORTED_LANGS.find(function(l) { return l.code === lang; }) || SUPPORTED_LANGS[0];
+    if (btnLangEl) btnLangEl.textContent = '🌐 ' + entry.code.toUpperCase();
+    if (searchLabelEl) searchLabelEl.textContent = t('searchLabel');
+    if (btnLookupEl && !btnLookupEl.disabled) btnLookupEl.textContent = t('lookupBtn');
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  }
+
+  function showLangModal() {
+    var grid = document.getElementById('lang-grid');
+    if (grid) {
+      grid.innerHTML = SUPPORTED_LANGS.map(function(l) {
+        return '<button class="lang-btn' + (l.code === lang ? ' selected' : '') + '" data-code="' + l.code + '">' +
+          '<span class="lang-btn-native">' + escHtml(l.native) + '</span>' +
+          '<span class="lang-btn-eng">' + escHtml(l.name) + '</span>' +
+        '</button>';
+      }).join('');
+      grid.querySelectorAll('.lang-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          lang = btn.dataset.code;
+          try { localStorage.setItem('fiq_lang', lang); } catch {}
+          document.getElementById('lang-overlay').classList.remove('open');
+          applyLang();
+          if (window.FiqChat) window.FiqChat.setLang(lang);
+        });
+      });
+    }
+    document.getElementById('lang-overlay').classList.add('open');
+  }
+
+  document.getElementById('btn-lang').addEventListener('click', showLangModal);
+  document.getElementById('lang-overlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  // Show language picker on first visit
+  (function() {
+    try {
+      if (!localStorage.getItem('fiq_lang')) {
+        setTimeout(showLangModal, 800);
+      }
+    } catch {}
+  })();
+
   /* ── State ───────────────────────────────────────────────────── */
   var currentUser = null;
   var currentResult = null;
@@ -381,6 +552,7 @@
       renderUserInfo();
       authLoading.style.display = 'none';
       appShell.style.display = 'block';
+      applyLang();
       if (data.trialExpired) showUpgradeModal('trial_expired');
     })
     .catch(function() { window.location.href = '/'; });
@@ -517,7 +689,7 @@
     fetch('/api/lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formName: formName }),
+      body: JSON.stringify({ formName: formName, lang: lang }),
     })
     .then(function(res) {
       if (res.status === 401) { window.location.href = '/'; return null; }
@@ -569,7 +741,7 @@
   function setLoading(on, formName) {
     btnLookup.disabled = on;
     searchInput.disabled = on;
-    btnLookup.textContent = on ? 'Looking up…' : 'Look Up Form';
+    btnLookup.textContent = on ? 'Looking up…' : t('lookupBtn');
     if (on) {
       statusArea.innerHTML =
         '<div class="loading-state fade-in">' +
@@ -596,11 +768,11 @@
         '<div class="guide-bar-left">' +
           '<span class="guide-bar-icon">🤖</span>' +
           '<div>' +
-            '<p class="guide-bar-title">Not sure how to fill this out?</p>' +
-            '<p class="guide-bar-sub">Let our AI walk you through every field, one step at a time.</p>' +
+            '<p class="guide-bar-title">' + escHtml(t('guideTitle')) + '</p>' +
+            '<p class="guide-bar-sub">' + escHtml(t('guideSub')) + '</p>' +
           '</div>' +
         '</div>' +
-        '<button class="btn-guide" id="btn-guide-form">Guide me through this →</button>' +
+        '<button class="btn-guide" id="btn-guide-form">' + escHtml(t('guideBtn')) + '</button>' +
       '</div>';
     var html =
       guideBar +
@@ -645,7 +817,8 @@
           currentResult.form_name,
           currentResult.instructions,
           hasPdf ? function (done) { downloadFilledForm(done); } : null,
-          savedProfile  // pass masked profile for pre-fill greeting
+          savedProfile,
+          lang
         );
       }
     });
@@ -664,10 +837,10 @@
 
   function renderTabBar() {
     return '<div class="tab-bar" role="tablist">' +
-      '<button class="tab-btn active" data-tab="overview">Overview</button>' +
-      '<button class="tab-btn" data-tab="instructions">Instructions</button>' +
-      '<button class="tab-btn" data-tab="sample">Filled Sample</button>' +
-      '<button class="tab-btn" data-tab="nextsteps">✅ Next Steps</button>' +
+      '<button class="tab-btn active" data-tab="overview">' + escHtml(t('tabOverview')) + '</button>' +
+      '<button class="tab-btn" data-tab="instructions">' + escHtml(t('tabInstructions')) + '</button>' +
+      '<button class="tab-btn" data-tab="sample">' + escHtml(t('tabSample')) + '</button>' +
+      '<button class="tab-btn" data-tab="nextsteps">' + escHtml(t('tabNextSteps')) + '</button>' +
     '</div>';
   }
 
@@ -776,10 +949,12 @@
     var items = (r.instructions || []).map(function(item, i) {
       var warn = item.warning
         ? '<p class="instr-warn">⚠️ ' + escHtml(item.warning) + '</p>' : '';
+      var translatedLabelHtml = (item.translated_label && lang !== 'en')
+        ? '<span class="translated-label">' + escHtml(item.translated_label) + '</span>' : '';
       return '<li class="instr-item">' +
         '<div class="instr-num">' + (i + 1) + '</div>' +
         '<div style="flex:1;">' +
-          '<p class="instr-field">' + escHtml(item.field) + '</p>' +
+          '<p class="instr-field">' + escHtml(item.field) + translatedLabelHtml + '</p>' +
           '<p class="instr-text">' + escHtml(item.instruction) + '</p>' +
           warn +
         '</div>' +
@@ -797,8 +972,10 @@
 
   function renderSample(r) {
     var rows = (r.sample || []).map(function(item) {
+      var translatedLabelHtml = (item.translated_label && lang !== 'en')
+        ? '<span class="translated-label">' + escHtml(item.translated_label) + '</span>' : '';
       return '<div class="sample-row">' +
-        '<span class="sample-field">' + escHtml(item.field) + '</span>' +
+        '<span class="sample-field">' + escHtml(item.field) + translatedLabelHtml + '</span>' +
         '<span class="sample-arrow">→</span>' +
         '<span class="sample-value">' + escHtml(item.value) + '</span>' +
       '</div>';
@@ -1065,7 +1242,7 @@
     fetch('/api/next-steps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formName: formName, state: state }),
+      body: JSON.stringify({ formName: formName, state: state, lang: lang }),
     })
     .then(function(res) { return res.json(); })
     .then(function(d) {

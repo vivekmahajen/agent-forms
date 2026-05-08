@@ -11,9 +11,52 @@
     } catch { return 'anon'; }
   })();
 
+  // ── Widget language strings ──────────────────────────────────────
+  var WIDGET_LANG = (function() {
+    try { return localStorage.getItem('fiq_lang') || 'en'; } catch { return 'en'; }
+  })();
+
+  var WIDGET_T = {
+    placeholder: {
+      en: 'Ask anything about forms…',
+      es: 'Pregunta sobre formularios…',
+      pt: 'Pergunte sobre formulários…',
+      fr: 'Posez une question sur les formulaires…',
+      zh: '有关表格的任何问题…',
+      vi: 'Hỏi bất cứ điều gì về biểu mẫu…',
+      tl: 'Magtanong tungkol sa mga form…',
+      ko: '양식에 대해 무엇이든 물어보세요…',
+      ar: 'اسأل أي شيء عن النماذج…',
+    },
+    uploadLabel: {
+      en: '📎 Upload a prior return, ID, or confirmation letter to pre-fill fields',
+      es: '📎 Sube una declaración previa, identificación o carta de confirmación',
+      pt: '📎 Envie uma declaração anterior, ID ou carta de confirmação',
+      fr: '📎 Téléchargez une déclaration précédente, une pièce d\'identité ou une lettre',
+      zh: '📎 上传以前的申报表、身份证件或确认信以自动填写字段',
+      vi: '📎 Tải lên tờ khai trước, CMND hoặc thư xác nhận để điền sẵn',
+      tl: '📎 Mag-upload ng nakaraang tax return, ID, o liham ng kumpirmasyon',
+      ko: '📎 이전 신고서, 신분증 또는 확인서를 업로드하여 자동 입력',
+      ar: '📎 ارفع إقرارًا سابقًا أو هوية أو رسالة تأكيد لملء الحقول تلقائيًا',
+    },
+  };
+
+  function wt(key) {
+    var map = WIDGET_T[key];
+    if (!map) return key;
+    return map[WIDGET_LANG] || map['en'] || key;
+  }
+
+  function applyWidgetLang() {
+    var inputEl = document.getElementById('fiq-input');
+    var uploadLabelEl = document.getElementById('fiq-upload-label');
+    if (inputEl) inputEl.setAttribute('placeholder', wt('placeholder'));
+    if (uploadLabelEl) uploadLabelEl.textContent = wt('uploadLabel');
+  }
+
   // ── Conversation history & form context ─────────────────────────
   var history = [];
-  var activeFormContext = null;  // { formName, fields, savedProfile }
+  var activeFormContext = null;  // { formName, fields, savedProfile, lang }
 
   // ── Inject CSS ───────────────────────────────────────────────────
   var style = document.createElement('style');
@@ -276,6 +319,8 @@
   var isStreaming   = false;
   var downloadCallback = null;
   var privacyAccepted  = false;
+
+  applyWidgetLang();
 
   dlBtn.addEventListener('click', function () {
     if (typeof downloadCallback !== 'function') return;
@@ -627,9 +672,9 @@
 
     // Start a guided form-filling session from the app page
     // onDownload(callback) is called when the user clicks the in-chat download button
-    startGuide: function (formName, fields, onDownload, savedProfile) {
-      // Reset state — include masked profile so API can pre-fill known fields
-      activeFormContext = { formName: formName, fields: fields, savedProfile: savedProfile || {} };
+    startGuide: function (formName, fields, onDownload, savedProfile, guideLang) {
+      // Reset state — include masked profile and language so API can pre-fill and respond in user's language
+      activeFormContext = { formName: formName, fields: fields, savedProfile: savedProfile || {}, lang: guideLang || WIDGET_LANG };
       downloadCallback = typeof onDownload === 'function' ? onDownload : null;
       history = [];
       messagesEl.innerHTML = '';
@@ -675,5 +720,11 @@
     isGuideMode: function () { return activeFormContext !== null; },
     getHistory:  function () { return history.slice(); },
     getFormContext: function () { return activeFormContext; },
+
+    // Called by app.html when the user changes language
+    setLang: function (newLang) {
+      WIDGET_LANG = newLang;
+      applyWidgetLang();
+    },
   };
 })();
