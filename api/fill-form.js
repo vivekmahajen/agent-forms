@@ -243,8 +243,10 @@ module.exports = async function handler(req, res) {
     // Single combined call: extract user answers from chat AND map to PDF fields at once
     try {
       mapping = await extractAndMapFields(chatHistory, fieldList, fieldInfo, apiKey, userProfile);
-    } catch (_) {
-      // fall through to sample-data path below
+      if (!Array.isArray(mapping) || mapping.length === 0) mapping = null;
+    } catch (chatErr) {
+      console.error('extractAndMapFields failed:', chatErr.message);
+      mapping = null; // fall through to sample-data path
     }
   }
 

@@ -223,7 +223,7 @@
     dlBtn.disabled = true;
     dlBtn.textContent = '⏳ Building PDF…';
     document.getElementById('fiq-dl-bar-text').textContent = 'Extracting your answers and filling the form…';
-    downloadCallback(function (ok) {
+    downloadCallback(function (ok, errMsg) {
       dlBtn.disabled = false;
       if (ok) {
         dlBtn.textContent = '✅ Downloaded!';
@@ -234,7 +234,7 @@
         }, 4000);
       } else {
         dlBtn.textContent = '📥 Try again';
-        document.getElementById('fiq-dl-bar-text').textContent = '⚠️ Download failed — check your connection and try again.';
+        document.getElementById('fiq-dl-bar-text').textContent = '⚠️ ' + (errMsg || 'Download failed — please try again.');
       }
     });
   });
