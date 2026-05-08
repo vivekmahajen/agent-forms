@@ -56,10 +56,34 @@
     .card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); padding: 1.5rem; }
 
     /* ── Tabs ───────────────────────────────────────────────────── */
-    .tab-bar { display: flex; align-items: center; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; }
-    .tab-btn { padding: 0.7rem 1.1rem; font-family: inherit; font-size: 0.875rem; font-weight: 400; color: #6b7280; background: none; border: none; border-bottom: 2.5px solid transparent; margin-bottom: -2px; cursor: pointer; }
+    .tab-bar { display: flex; align-items: center; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .tab-btn { padding: 0.7rem 1.1rem; font-family: inherit; font-size: 0.875rem; font-weight: 400; color: #6b7280; background: none; border: none; border-bottom: 2.5px solid transparent; margin-bottom: -2px; cursor: pointer; white-space: nowrap; }
     .tab-btn.active { border-bottom-color: #F59E0B; color: #0F1E3C; font-weight: 600; }
     .tab-panel { display: none; }
+
+    /* ── Next-steps checklist ───────────────────────────────────── */
+    .ns-loading { color:#94a3b8; font-size:0.85rem; padding:1rem 0; }
+    .ns-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0.85rem; }
+    .ns-item { display:flex; gap:0.875rem; align-items:flex-start; padding:0.9rem 1rem; border-radius:10px; background:#f8fafc; border:1.5px solid #e2e8f0; transition:background 0.15s; }
+    .ns-item.done { background:#f0fdf4; border-color:#bbf7d0; opacity:0.75; }
+    .ns-item.done .ns-title { text-decoration:line-through; color:#94a3b8; }
+    .ns-check { flex-shrink:0; width:20px; height:20px; border-radius:5px; border:2px solid #cbd5e1; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; margin-top:1px; transition:background 0.15s, border-color 0.15s; }
+    .ns-check.checked { background:#22c55e; border-color:#22c55e; color:#fff; }
+    .ns-body { flex:1; }
+    .ns-badge { display:inline-block; font-size:0.64rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 7px; border-radius:20px; margin-bottom:4px; }
+    .ns-badge-filing_method  { background:#dbeafe; color:#1d4ed8; }
+    .ns-badge-fee            { background:#dcfce7; color:#166534; }
+    .ns-badge-processing_time{ background:#fef9c3; color:#854d0e; }
+    .ns-badge-documents      { background:#ede9fe; color:#5b21b6; }
+    .ns-badge-deadline       { background:#fee2e2; color:#b91c1c; }
+    .ns-badge-after_submission{ background:#e0f2fe; color:#0369a1; }
+    .ns-badge-tip            { background:#fff7ed; color:#c2410c; }
+    .ns-title { font-size:0.875rem; font-weight:600; color:#0F1E3C; margin:0 0 3px; }
+    .ns-detail { font-size:0.8rem; color:#475569; line-height:1.55; margin:0 0 5px; }
+    .ns-links { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:4px; }
+    .ns-link { font-size:0.75rem; color:#1d4ed8; text-decoration:none; }
+    .ns-link:hover { text-decoration:underline; }
+    .ns-progress { font-size:0.75rem; color:#94a3b8; margin-bottom:1rem; }
     .tab-panel.active { display: block; }
 
     /* ── Info boxes ─────────────────────────────────────────────── */
@@ -585,11 +609,13 @@
         '<div id="panel-overview"  class="tab-panel active">' + renderOverview(r)     + '</div>' +
         '<div id="panel-instructions" class="tab-panel">'     + renderInstructions(r) + '</div>' +
         '<div id="panel-sample"    class="tab-panel">'        + renderSample(r)       + '</div>' +
+        '<div id="panel-nextsteps" class="tab-panel"><p class="ns-loading">Loading next steps…</p></div>' +
       '</div>' +
       renderRelatedForms(r);
     statusArea.innerHTML = html;
 
-    // Wire up tab buttons
+    // Wire up tab buttons — lazy-load Next Steps on first click
+    var nextStepsLoaded = false;
     statusArea.querySelectorAll('.tab-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var target = btn.dataset.tab;
@@ -597,6 +623,10 @@
         statusArea.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
         btn.classList.add('active');
         document.getElementById('panel-' + target).classList.add('active');
+        if (target === 'nextsteps' && !nextStepsLoaded) {
+          nextStepsLoaded = true;
+          loadNextSteps(r.form_name);
+        }
       });
     });
 
@@ -637,6 +667,7 @@
       '<button class="tab-btn active" data-tab="overview">Overview</button>' +
       '<button class="tab-btn" data-tab="instructions">Instructions</button>' +
       '<button class="tab-btn" data-tab="sample">Filled Sample</button>' +
+      '<button class="tab-btn" data-tab="nextsteps">✅ Next Steps</button>' +
     '</div>';
   }
 
@@ -1008,6 +1039,98 @@
   upgradeModal.addEventListener('click', function(e) { if (e.target === upgradeModal) upgradeModal.classList.remove('open'); });
 
   /* ── Utility ─────────────────────────────────────────────────── */
+  /* ── Next Steps ─────────────────────────────────────────────── */
+  var BADGE_LABELS = {
+    filing_method: '📬 Filing Method', fee: '💰 Fee', processing_time: '⏱ Processing',
+    documents: '📄 Documents', deadline: '⚠️ Deadline',
+    after_submission: '📩 After Submission', tip: '💡 Tip',
+  };
+
+  function nsCheckKey(formName, step) {
+    return 'ns_check:' + formName.toLowerCase().replace(/\s+/g, '_') + ':' + step;
+  }
+
+  function loadNextSteps(formName) {
+    var panel = document.getElementById('panel-nextsteps');
+    if (!panel) return;
+
+    var state = (savedProfile && savedProfile.state) ? savedProfile.state : '';
+    fetch('/api/next-steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formName: formName, state: state }),
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(d) {
+      if (!d.steps || !d.steps.length) {
+        panel.innerHTML = '<p style="color:#94a3b8;font-size:0.85rem;">No next-steps available for this form.</p>';
+        return;
+      }
+      panel.innerHTML = renderNextSteps(formName, d.steps);
+      wireNextStepsChecks(formName);
+    })
+    .catch(function() {
+      panel.innerHTML = '<p style="color:#b91c1c;font-size:0.85rem;">Could not load next steps. Please try again.</p>';
+    });
+  }
+
+  function renderNextSteps(formName, steps) {
+    var done = steps.filter(function(s) {
+      return localStorage.getItem(nsCheckKey(formName, s.step)) === '1';
+    }).length;
+    var progress = done > 0
+      ? '<p class="ns-progress">' + done + ' of ' + steps.length + ' steps completed</p>'
+      : '';
+
+    var items = steps.map(function(s) {
+      var checked = localStorage.getItem(nsCheckKey(formName, s.step)) === '1';
+      var badgeClass = 'ns-badge-' + (s.category || 'tip');
+      var badgeLabel = BADGE_LABELS[s.category] || s.category;
+      var links = (s.links || []).filter(function(l) { return l.url && l.label; }).map(function(l) {
+        return '<a href="' + escAttr(l.url) + '" target="_blank" rel="noopener" class="ns-link">↗ ' + escHtml(l.label) + '</a>';
+      }).join('');
+
+      return '<li class="ns-item' + (checked ? ' done' : '') + '" data-step="' + s.step + '">' +
+        '<div class="ns-check' + (checked ? ' checked' : '') + '" data-step="' + s.step + '" role="checkbox" aria-checked="' + checked + '" tabindex="0">' +
+          (checked ? '✓' : '') +
+        '</div>' +
+        '<div class="ns-body">' +
+          '<span class="ns-badge ' + badgeClass + '">' + escHtml(badgeLabel) + '</span>' +
+          '<p class="ns-title">' + escHtml(s.title) + '</p>' +
+          '<p class="ns-detail">' + escHtml(s.detail) + '</p>' +
+          (links ? '<div class="ns-links">' + links + '</div>' : '') +
+        '</div>' +
+      '</li>';
+    }).join('');
+
+    return progress + '<ul class="ns-list">' + items + '</ul>';
+  }
+
+  function wireNextStepsChecks(formName) {
+    var panel = document.getElementById('panel-nextsteps');
+    if (!panel) return;
+    panel.querySelectorAll('.ns-check').forEach(function(el) {
+      function toggle() {
+        var step = el.dataset.step;
+        var key = nsCheckKey(formName, step);
+        var nowChecked = localStorage.getItem(key) !== '1';
+        localStorage.setItem(key, nowChecked ? '1' : '0');
+        el.classList.toggle('checked', nowChecked);
+        el.textContent = nowChecked ? '✓' : '';
+        el.setAttribute('aria-checked', String(nowChecked));
+        var item = el.closest('.ns-item');
+        if (item) item.classList.toggle('done', nowChecked);
+        // Update progress text
+        var allSteps = panel.querySelectorAll('.ns-item');
+        var doneCount = panel.querySelectorAll('.ns-item.done').length;
+        var prog = panel.querySelector('.ns-progress');
+        if (prog) prog.textContent = doneCount + ' of ' + allSteps.length + ' steps completed';
+      }
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', function(e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+    });
+  }
+
   function escHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;')
