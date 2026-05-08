@@ -1,5 +1,4 @@
 const { createKV, getSessionToken } = require('./_utils');
-const { lookupVersion, parseRevFromDocType, revsMismatch } = require('./_form-versions');
 const kv = createKV();
 
 const SUPPORTED_TYPES = {
@@ -117,22 +116,6 @@ module.exports = async function handler(req, res) {
 
     // Explicitly note: document not retained
     result.privacyNote = 'This document was processed in real-time and has not been stored.';
-
-    // Version mismatch detection: compare uploaded document revision to stored current
-    const uploadedRev = parseRevFromDocType(result.docType);
-    if (uploadedRev) {
-      const stored = lookupVersion(targetForm || result.docType || '');
-      if (stored) {
-        result.versionInfo = {
-          uploadedRev,
-          currentRev: stored.rev,
-          isMismatch: revsMismatch(uploadedRev, stored.rev),
-        };
-      } else {
-        result.versionInfo = { uploadedRev, currentRev: null, isMismatch: false };
-      }
-    }
-
     return res.status(200).json(result);
   } catch (err) {
     return res.status(500).json({ error: err.message });
