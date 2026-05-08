@@ -86,6 +86,15 @@
     .ns-progress { font-size:0.75rem; color:#94a3b8; margin-bottom:1rem; }
     .tab-panel.active { display: block; }
 
+    /* ── Form version badge ─────────────────────────────────────── */
+    .form-version-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+    .form-version-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .form-version-badge.stale { background: #fefce8; color: #854d0e; border-color: #fde68a; }
+    .form-version-badge.verified { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .form-version-expires { font-size: 0.7rem; color: #94a3b8; }
+    .version-update-banner { display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 10px; font-size: 0.85rem; color: #92400e; line-height: 1.5; }
+    .version-upcoming-banner { margin-bottom: 0.75rem; padding: 0.65rem 0.875rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 0.8rem; color: #1e3a8a; line-height: 1.5; }
+
     /* ── Info boxes ─────────────────────────────────────────────── */
     .info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.875rem 1rem; margin-bottom: 0.75rem; }
     .info-label { font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 0.4rem; }
@@ -698,6 +707,7 @@
       '</div>';
     var html =
       guideBar +
+      '<div id="version-update-banner" class="version-update-banner"></div>' +
       '<div class="card fade-in">' +
         renderTabBar() +
         '<div id="panel-overview"  class="tab-panel active">' + renderOverview(r)     + '</div>' +
@@ -707,6 +717,9 @@
       '</div>' +
       renderRelatedForms(r);
     statusArea.innerHTML = html;
+
+    // Background version check (non-blocking — updates badge and banner if revision changed)
+    if (r.form_name) checkFormVersion(r.form_name, r.official_pdf_url);
 
     // Wire up tab buttons — lazy-load Next Steps on first click
     var nextStepsLoaded = false;
@@ -814,7 +827,26 @@
     var contextSection = (keyFacts || penalties || changes || qualifies)
       ? '<div class="context-grid">' + keyFacts + penalties + changes + qualifies + '</div>' : '';
 
+    // Version badge
+    var versionRow = '';
+    if (r.versionInfo && r.versionInfo.rev) {
+      var v = r.versionInfo;
+      var badgeClass = v.source === 'verified' ? 'verified' : '';
+      var icon = v.source === 'verified' ? '✓' : '📋';
+      versionRow =
+        '<div class="form-version-row">' +
+          '<span id="form-version-badge" class="form-version-badge ' + badgeClass + '">' +
+            icon + ' Rev. ' + escHtml(v.rev) +
+          '</span>' +
+          (v.expires ? '<span class="form-version-expires">Expires ' + escHtml(v.expires) + '</span>' : '') +
+        '</div>';
+      if (v.upcoming) {
+        versionRow += '<div class="version-upcoming-banner">📅 ' + escHtml(v.upcoming) + '</div>';
+      }
+    }
+
     return '<h2 class="form-title">' + escHtml(r.form_name) + '</h2>' + alias +
+      versionRow +
       '<div class="info-box"><p class="info-label">Issued By</p><p class="info-body">' + escHtml(r.issued_by) + '</p></div>' +
       '<div class="info-box"><p class="info-label">Purpose</p><p class="info-body">' + escHtml(r.purpose) + '</p></div>' +
       '<div class="info-box"><p class="info-label">Who Needs It</p><ul style="margin:0;padding-left:1.25rem;">' + bullets + '</ul></div>' +
@@ -1132,6 +1164,46 @@
         doLookup(n);
       });
     });
+  }
+
+  /* ── Form version check (background, non-blocking) ─────────── */
+  function checkFormVersion(formName, pdfUrl) {
+    fetch('/api/check-form-version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formName: formName, pdfUrl: pdfUrl || undefined }),
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(d) {
+      // Update version badge with verified data
+      var badge = document.getElementById('form-version-badge');
+      if (badge && d.current && d.current.rev) {
+        var checkedDate = d.checkedAt ? new Date(d.checkedAt).toLocaleDateString() : '';
+        badge.className = 'form-version-badge ' + (d.current.source === 'verified' ? 'verified' : '');
+        badge.textContent = (d.current.source === 'verified' ? '✓ ' : '📋 ') +
+          'Rev. ' + d.current.rev + (checkedDate ? ' — checked ' + checkedDate : '');
+      }
+      // Show "recently updated" banner if revision changed since last check
+      if (d.isUpdated && d.previous && d.current) {
+        var banner = document.getElementById('version-update-banner');
+        if (banner) {
+          banner.textContent = '⚠️ This form was recently updated from Rev. ' + d.previous.rev +
+            ' to Rev. ' + d.current.rev + '. Field instructions have been refreshed — please review before submitting.';
+          banner.style.display = 'block';
+        }
+      }
+      // Show upcoming revision notice if announced
+      if (d.upcoming) {
+        var overviewPanel = document.getElementById('panel-overview');
+        if (overviewPanel && !overviewPanel.querySelector('.version-upcoming-banner')) {
+          var note = document.createElement('div');
+          note.className = 'version-upcoming-banner';
+          note.textContent = '📅 ' + d.upcoming;
+          overviewPanel.insertBefore(note, overviewPanel.firstChild);
+        }
+      }
+    })
+    .catch(function() {}); // version check failing is non-fatal
   }
 
   /* ── Upgrade modal ───────────────────────────────────────────── */
