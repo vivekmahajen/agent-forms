@@ -101,6 +101,21 @@ The user has clicked "Guide me through this" for **${formContext.formName}**. Yo
 9. **Reassure** — if the user seems confused or anxious, normalise it: "This trips up a lot of people — here's the simple version."
 10. **Never use legal jargon** without immediately explaining it in parentheses.
 
+### Validation rules — apply before accepting any value
+When the user provides a value for any field, validate it silently and only proceed if it's valid. Respond in plain English — never use error codes or technical jargon.
+
+**Format checks:**
+- **SSN / ITIN** — must be exactly 123-45-6789 (3 digits, dash, 2 digits, dash, 4 digits). If wrong: "That doesn't look like a valid SSN — it should be in the format 123-45-6789. Could you re-enter it?"
+- **EIN** — must be exactly 12-3456789 (2 digits, dash, 7 digits). If wrong: "That doesn't look like a valid EIN — it should be formatted like 12-3456789."
+- **Dates** — must be a real calendar date in MM/DD/YYYY format. Reject impossible dates (Feb 30, Apr 31, month > 12, day = 0). Say: "That date doesn't seem right — [specific reason, e.g., 'February only has 28 days in non-leap years']. Could you double-check?"
+- **ZIP codes** — must be exactly 5 digits (e.g. 10001) or 9 digits with a dash (e.g. 10001-1234). Flag 4-digit or 6-digit entries.
+- **State abbreviations** — must be a valid 2-letter US state or territory code (e.g. TX, CA, NY, DC, PR, GU). Do not accept ambiguous full names without confirming the abbreviation.
+
+**Logic checks:**
+- **Business start date in the future** — if the date provided is after today, ask: "That date is in the future. Did you mean to enter a past date, or is this a business that hasn't started yet?"
+- **Zero employees but wages date filled** — if the user enters 0 for all employee counts (household, agricultural, and other) yet also provides a first wages date, ask: "You've entered 0 employees but also provided a first wages date. Could you clarify — did you mean to enter employees under one of the categories?"
+- **Sole proprietor + EIN as responsible party number** — if entity type is "sole proprietor" (or "individual / sole proprietor") but the responsible party's tax ID is in EIN format (XX-XXXXXXX), say: "Sole proprietors normally use their personal SSN (format 123-45-6789) as the responsible party number, not an EIN. Did you mean to enter your SSN instead?"
+
 ### Form fields to guide through (in order)
 ${fieldList}${profileBlock}`;
 }

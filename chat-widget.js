@@ -206,6 +206,9 @@
     #fiq-send:disabled { background: #94a3b8; cursor: not-allowed; }
     #fiq-send svg { width: 16px; height: 16px; }
     #fiq-powered { text-align: center; font-size: 0.62rem; color: #cbd5e1; margin: 5px 0 0; }
+    #fiq-validation-warn { display: none; margin: 0 10px 6px; padding: 6px 10px; border-radius: 6px; font-size: 0.76rem; line-height: 1.5; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; }
+    #fiq-validation-warn.visible { display: block; }
+    #fiq-validation-warn.is-error { border-color: #fca5a5; background: #fff5f5; color: #991b1b; }
   `;
   document.head.appendChild(style);
 
@@ -259,6 +262,7 @@
         '<button id="fiq-upload-btn" type="button">Upload</button>' +
         '<input id="fiq-file-input" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" />' +
       '</div>' +
+      '<div id="fiq-validation-warn" role="alert" aria-live="polite"></div>' +
       '<form id="fiq-form">' +
         '<textarea id="fiq-input" rows="1" placeholder="' + wt('placeholder') + '" aria-label="Chat message"></textarea>' +
         '<button type="submit" id="fiq-send" aria-label="Send">' +
@@ -544,10 +548,88 @@
     if (text && !isStreaming) sendMessage(text);
   });
 
+  // ── Field validation ─────────────────────────────────────────────
+  var VALID_STATES = 'AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC AS GU MP PR VI'.split(' ');
+  var validationEl = document.getElementById('fiq-validation-warn');
+
+  function validateGuideInput(text) {
+    if (!text || !activeFormContext) return [];
+    var t = text.trim();
+    var issues = [];
+
+    // SSN: 9 digits (with or without separators) not matching XXX-XX-XXXX
+    var ssnRaw = t.replace(/[- ]/g, '').match(/(?<!\d)(\d{9})(?!\d)/);
+    if (ssnRaw && !/\b\d{3}-\d{2}-\d{4}\b/.test(t) && !/\b\d{2}-\d{7}\b/.test(t)) {
+      issues.push({ level: 'error', msg: "That doesn’t look like a valid SSN format — it should be 123-45-6789 (three groups separated by dashes)." });
+    } else {
+      // Partial SSN attempt: 3-2-1to3 digits (last group wrong)
+      var ssnPartial = t.match(/\b\d{3}[- ]\d{2}[- ]\d{1,3}\b/);
+      if (ssnPartial && !/\b\d{3}-\d{2}-\d{4}\b/.test(t)) {
+        issues.push({ level: 'error', msg: "SSNs have a 4-digit last group — e.g. 123-45-6789. The last part of what you entered looks too short." });
+      }
+    }
+
+    // EIN: 9 digits in XX-XXXXXXX pattern check
+    var einAttempt = t.match(/\b(\d{2})[- ](\d+)\b/);
+    if (einAttempt && !/\b\d{3}-\d{2}-\d{4}\b/.test(t)) {
+      var einDigits = einAttempt[1] + einAttempt[2];
+      if (einDigits.length === 9 && !/\b\d{2}-\d{7}\b/.test(t)) {
+        issues.push({ level: 'error', msg: "That doesn’t look like a valid EIN format — it should be 12-3456789 (two digits, dash, seven digits)." });
+      }
+    }
+
+    // Date: find MM/DD/YYYY or MM-DD-YYYY patterns
+    var dateRe = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g;
+    var dm;
+    while ((dm = dateRe.exec(t)) !== null) {
+      var mo = +dm[1], dy = +dm[2], yr = +dm[3];
+      if (yr < 100) yr += yr < 50 ? 2000 : 1900;
+      if (mo < 1 || mo > 12) {
+        issues.push({ level: 'error', msg: "That doesn’t look like a valid date — the month should be between 01 and 12." });
+      } else {
+        var maxDay = new Date(yr, mo, 0).getDate();
+        var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        if (dy < 1 || dy > maxDay) {
+          issues.push({ level: 'error', msg: MONTHS[mo - 1] + " " + yr + " only has " + maxDay + " days, so day " + dy + " doesn’t exist." });
+        }
+      }
+    }
+
+    // ZIP: exact 4-digit message = clearly one digit short
+    if (/^\d{4}$/.test(t)) {
+      issues.push({ level: 'warn', msg: "ZIP codes are 5 digits — did you miss the last digit? (e.g. 10001)" });
+    }
+
+    // State: entire message is 2 uppercase letters → validate
+    if (/^[A-Z]{2}$/.test(t) && VALID_STATES.indexOf(t) === -1) {
+      issues.push({ level: 'error', msg: "“" + t + "” isn’t a recognized US state or territory code. Please use a 2-letter abbreviation like TX, CA, NY, or DC." });
+    }
+
+    return issues;
+  }
+
+  function showValidationWarnings(issues) {
+    if (!validationEl) return;
+    if (!issues || !issues.length) {
+      validationEl.className = '';
+      validationEl.textContent = '';
+      return;
+    }
+    var hasError = issues.some(function(i) { return i.level === 'error'; });
+    validationEl.className = 'visible' + (hasError ? ' is-error' : '');
+    validationEl.textContent = issues.map(function(i) { return i.msg; }).join(' · ');
+  }
+
   // Auto-grow textarea
+  var validationTimer = null;
   inputEl.addEventListener('input', function () {
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+    // Debounced validation (only in guide mode)
+    clearTimeout(validationTimer);
+    validationTimer = setTimeout(function () {
+      showValidationWarnings(validateGuideInput(inputEl.value));
+    }, 350);
   });
   // Send on Enter (Shift+Enter for newline)
   inputEl.addEventListener('keydown', function (e) {
@@ -560,6 +642,8 @@
 
   function sendMessage(text) {
     if (isStreaming) return;
+    showValidationWarnings([]); // clear inline warnings on send
+    clearTimeout(validationTimer);
     inputEl.value = '';
     inputEl.style.height = 'auto';
     sendBtn.disabled = true;
