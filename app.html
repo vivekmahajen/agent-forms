@@ -231,6 +231,20 @@
     .pm-save:hover { background:#1e3560; }
     .pm-cancel { padding:0.55rem 1.1rem; background:#f1f5f9; color:#475569; border:none; border-radius:7px; font-family:inherit; font-size:0.85rem; cursor:pointer; }
     .pm-save-note { font-size:0.72rem; color:#22c55e; align-self:center; display:none; }
+
+    /* ── Language picker modal ──────────────────────────────── */
+    #lang-overlay { display:none; position:fixed; inset:0; background:rgba(15,30,60,0.75); z-index:9000; align-items:center; justify-content:center; padding:1rem; }
+    #lang-overlay.open { display:flex; }
+    #lang-modal { background:#fff; border-radius:16px; width:100%; max-width:420px; padding:2rem 1.75rem; box-shadow:0 24px 64px rgba(0,0,0,0.25); text-align:center; }
+    .lang-title { font-family:'DM Serif Display',serif; font-size:1.2rem; color:#0F1E3C; margin:0 0 0.3rem; line-height:1.3; }
+    .lang-sub   { font-size:0.8rem; color:#94a3b8; margin:0 0 1.5rem; font-style:italic; }
+    .lang-grid  { display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; margin-bottom:1.25rem; }
+    .lang-btn   { padding:0.7rem 0.4rem; border:1.5px solid #e2e8f0; border-radius:9px; background:#f8fafc; font-family:inherit; font-size:0.83rem; color:#334155; cursor:pointer; transition:border-color 0.15s,background 0.15s; line-height:1.3; }
+    .lang-btn:hover { border-color:#7c3aed; background:#f5f3ff; color:#4c1d95; }
+    .lang-btn.selected { border-color:#7c3aed; background:#ede9fe; color:#4c1d95; font-weight:600; }
+    .btn-lang-selector { background:none; border:1.5px solid #2e4470; color:#94a3b8; border-radius:7px; padding:0.4rem 0.75rem; font-family:inherit; font-size:0.78rem; cursor:pointer; white-space:nowrap; }
+    .btn-lang-selector:hover { border-color:#7c3aed; color:#c4b5fd; }
+    .translated-label { font-size:0.75rem; color:#7c3aed; font-weight:500; display:block; margin-top:1px; }
   </style>
 </head>
 <body>
@@ -251,6 +265,7 @@
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
           <div class="user-info" id="user-info"></div>
           <button id="btn-profile" style="background:none;border:1.5px solid #2e4470;color:#94a3b8;border-radius:7px;padding:0.4rem 0.85rem;font-family:inherit;font-size:0.78rem;cursor:pointer;" title="My Profile">👤 My Profile</button>
+          <button class="btn-lang-selector" id="btn-lang" title="Change language">🌐 EN</button>
           <button class="btn-signout" id="btn-signout">Sign out</button>
         </div>
       </div>
@@ -331,6 +346,25 @@
     </footer>
   </div>
 
+  <!-- Language Picker Modal -->
+  <div id="lang-overlay" role="dialog" aria-modal="true" aria-label="Language selection">
+    <div id="lang-modal">
+      <p class="lang-title" id="lang-modal-title">What language would you like to use?</p>
+      <p class="lang-sub"  id="lang-modal-sub">¿En qué idioma prefieres continuar?</p>
+      <div class="lang-grid">
+        <button class="lang-btn" data-lang="en">English</button>
+        <button class="lang-btn" data-lang="es">Español</button>
+        <button class="lang-btn" data-lang="pt">Português</button>
+        <button class="lang-btn" data-lang="fr">Français</button>
+        <button class="lang-btn" data-lang="zh">中文</button>
+        <button class="lang-btn" data-lang="vi">Tiếng Việt</button>
+        <button class="lang-btn" data-lang="tl">Tagalog</button>
+        <button class="lang-btn" data-lang="ko">한국어</button>
+        <button class="lang-btn" data-lang="ar">العربية</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Upgrade Modal -->
   <div class="modal-backdrop" id="upgrade-modal" role="dialog" aria-modal="true">
     <div class="modal-box">
@@ -350,6 +384,66 @@
   </div>
 
 <script>
+  /* ── Language / i18n ─────────────────────────────────────────── */
+  var SUPPORTED_LANGS = ['en','es','pt','fr','zh','vi','tl','ko','ar'];
+  var LANG_NAMES = { en:'English',es:'Español',pt:'Português',fr:'Français',zh:'中文',vi:'Tiếng Việt',tl:'Tagalog',ko:'한국어',ar:'العربية' };
+
+  var T = {
+    searchLabel: { en:'Find any government form', es:'Encuentra cualquier formulario gubernamental', pt:'Encontre qualquer formulário governamental', fr:'Trouvez tout formulaire officiel', zh:'查找任何政府表格', vi:'Tìm bất kỳ mẫu đơn chính phủ nào', tl:'Hanapin ang anumang opisyal na form', ko:'정부 양식 찾기', ar:'ابحث عن أي نموذج حكومي' },
+    guideTitle:  { en:'Not sure how to fill this out?', es:'¿No sabes cómo completar este formulario?', pt:'Não sabe como preencher?', fr:'Pas sûr(e) de comment remplir ce formulaire ?', zh:'不确定如何填写？', vi:'Không chắc cách điền vào mẫu này?', tl:'Hindi sigurado kung paano punan ito?', ko:'어떻게 작성해야 할지 모르시겠나요?', ar:'غير متأكد من كيفية ملء هذا النموذج؟' },
+    guideSub:    { en:'Let our AI walk you through every field, one step at a time.', es:'Nuestro asistente de IA te guiará campo por campo.', pt:'Nosso assistente de IA irá te guiar campo a campo.', fr:'Notre IA vous guide champ par champ, étape par étape.', zh:'让我们的AI一步一步引导您填写每个字段。', vi:'Để AI của chúng tôi hướng dẫn bạn từng bước, từng trường.', tl:'Hayaan ang aming AI na gabayan kayo sa bawat field.', ko:'AI가 모든 항목을 단계별로 안내해 드립니다.', ar:'دعنا نرشدك عبر كل خانة خطوة بخطوة.' },
+    guideBtn:    { en:'Guide me through this →', es:'Guíame paso a paso →', pt:'Me guie passo a passo →', fr:'Guide moi étape par étape →', zh:'逐步引导我填写 →', vi:'Hướng dẫn tôi từng bước →', tl:'Gabayan ako hakbang-hakbang →', ko:'단계별로 안내해 주세요 →', ar:'أرشدني خطوة بخطوة →' },
+    tabOverview: { en:'Overview', es:'Resumen', pt:'Visão geral', fr:'Aperçu', zh:'概览', vi:'Tổng quan', tl:'Pangkalahatang-ideya', ko:'개요', ar:'نظرة عامة' },
+    tabInstr:    { en:'Instructions', es:'Instrucciones', pt:'Instruções', fr:'Instructions', zh:'填写说明', vi:'Hướng dẫn', tl:'Mga Tagubilin', ko:'작성 안내', ar:'التعليمات' },
+    tabSample:   { en:'Filled Sample', es:'Ejemplo Rellenado', pt:'Exemplo Preenchido', fr:'Exemple Rempli', zh:'填写示例', vi:'Mẫu Đã Điền', tl:'Natapos na Halimbawa', ko:'작성 예시', ar:'نموذج مملوء' },
+    tabNext:     { en:'✅ Next Steps', es:'✅ Próximos pasos', pt:'✅ Próximos passos', fr:'✅ Étapes suivantes', zh:'✅ 后续步骤', vi:'✅ Các bước tiếp theo', tl:'✅ Susunod na hakbang', ko:'✅ 다음 단계', ar:'✅ الخطوات التالية' },
+    nsLoading:   { en:'Loading next steps…', es:'Cargando próximos pasos…', pt:'Carregando próximos passos…', fr:'Chargement des étapes suivantes…', zh:'正在加载后续步骤…', vi:'Đang tải các bước tiếp theo…', tl:'Naglo-load ng susunod na hakbang…', ko:'다음 단계 로딩 중…', ar:'جارٍ تحميل الخطوات التالية…' },
+    langTitle:   { en:'What language would you like to use?', es:'¿En qué idioma prefieres continuar?', pt:'Em que idioma você prefere continuar?', fr:'Dans quelle langue souhaitez-vous continuer ?', zh:'您希望使用哪种语言？', vi:'Bạn muốn sử dụng ngôn ngữ nào?', tl:'Anong wika ang gusto mong gamitin?', ko:'어떤 언어를 사용하시겠습니까?', ar:'ما اللغة التي تريد استخدامها؟' },
+  };
+
+  function t(key) { var d = T[key]; return d ? (d[lang] || d['en'] || key) : key; }
+
+  // Resolve language: saved preference → browser locale → English
+  var lang = localStorage.getItem('fiq_lang') || (function() {
+    var bl = (navigator.language || navigator.userLanguage || 'en').split('-')[0].toLowerCase();
+    if (bl === 'cmn' || bl === 'yue') bl = 'zh';
+    return SUPPORTED_LANGS.indexOf(bl) >= 0 ? bl : 'en';
+  })();
+
+  function applyLang() {
+    document.documentElement.setAttribute('lang', lang);
+    document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+    var sl = document.querySelector('.search-label');
+    if (sl) sl.textContent = t('searchLabel');
+    var bl = document.getElementById('btn-lang');
+    if (bl) bl.textContent = '🌐 ' + (LANG_NAMES[lang] || 'EN');
+  }
+
+  function showLangModal() {
+    var title = document.getElementById('lang-modal-title');
+    var sub   = document.getElementById('lang-modal-sub');
+    if (title) title.textContent = t('langTitle');
+    if (sub)   sub.textContent  = lang !== 'en' ? T.langTitle['en'] : T.langTitle['es'];
+    document.querySelectorAll('.lang-btn').forEach(function(b) {
+      b.classList.toggle('selected', b.dataset.lang === lang);
+    });
+    document.getElementById('lang-overlay').classList.add('open');
+  }
+
+  document.querySelectorAll('.lang-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      lang = btn.dataset.lang;
+      localStorage.setItem('fiq_lang', lang);
+      document.getElementById('lang-overlay').classList.remove('open');
+      applyLang();
+    });
+  });
+
+  document.getElementById('btn-lang').addEventListener('click', showLangModal);
+
+  applyLang();
+  if (!localStorage.getItem('fiq_lang')) showLangModal();
+
   /* ── State ───────────────────────────────────────────────────── */
   var currentUser = null;
   var currentResult = null;
@@ -517,7 +611,7 @@
     fetch('/api/lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formName: formName }),
+      body: JSON.stringify({ formName: formName, lang: lang !== 'en' ? lang : undefined }),
     })
     .then(function(res) {
       if (res.status === 401) { window.location.href = '/'; return null; }
@@ -596,11 +690,11 @@
         '<div class="guide-bar-left">' +
           '<span class="guide-bar-icon">🤖</span>' +
           '<div>' +
-            '<p class="guide-bar-title">Not sure how to fill this out?</p>' +
-            '<p class="guide-bar-sub">Let our AI walk you through every field, one step at a time.</p>' +
+            '<p class="guide-bar-title">' + escHtml(t('guideTitle')) + '</p>' +
+            '<p class="guide-bar-sub">' + escHtml(t('guideSub')) + '</p>' +
           '</div>' +
         '</div>' +
-        '<button class="btn-guide" id="btn-guide-form">Guide me through this →</button>' +
+        '<button class="btn-guide" id="btn-guide-form">' + escHtml(t('guideBtn')) + '</button>' +
       '</div>';
     var html =
       guideBar +
@@ -609,7 +703,7 @@
         '<div id="panel-overview"  class="tab-panel active">' + renderOverview(r)     + '</div>' +
         '<div id="panel-instructions" class="tab-panel">'     + renderInstructions(r) + '</div>' +
         '<div id="panel-sample"    class="tab-panel">'        + renderSample(r)       + '</div>' +
-        '<div id="panel-nextsteps" class="tab-panel"><p class="ns-loading">Loading next steps…</p></div>' +
+        '<div id="panel-nextsteps" class="tab-panel"><p class="ns-loading">' + escHtml(t('nsLoading')) + '</p></div>' +
       '</div>' +
       renderRelatedForms(r);
     statusArea.innerHTML = html;
@@ -645,7 +739,8 @@
           currentResult.form_name,
           currentResult.instructions,
           hasPdf ? function (done) { downloadFilledForm(done); } : null,
-          savedProfile  // pass masked profile for pre-fill greeting
+          savedProfile,
+          lang
         );
       }
     });
@@ -664,10 +759,10 @@
 
   function renderTabBar() {
     return '<div class="tab-bar" role="tablist">' +
-      '<button class="tab-btn active" data-tab="overview">Overview</button>' +
-      '<button class="tab-btn" data-tab="instructions">Instructions</button>' +
-      '<button class="tab-btn" data-tab="sample">Filled Sample</button>' +
-      '<button class="tab-btn" data-tab="nextsteps">✅ Next Steps</button>' +
+      '<button class="tab-btn active" data-tab="overview">'      + escHtml(t('tabOverview')) + '</button>' +
+      '<button class="tab-btn" data-tab="instructions">'         + escHtml(t('tabInstr'))    + '</button>' +
+      '<button class="tab-btn" data-tab="sample">'               + escHtml(t('tabSample'))   + '</button>' +
+      '<button class="tab-btn" data-tab="nextsteps">'            + escHtml(t('tabNext'))     + '</button>' +
     '</div>';
   }
 
@@ -776,10 +871,12 @@
     var items = (r.instructions || []).map(function(item, i) {
       var warn = item.warning
         ? '<p class="instr-warn">⚠️ ' + escHtml(item.warning) + '</p>' : '';
+      var translatedLabel = item.translated_label
+        ? '<span class="translated-label">' + escHtml(item.translated_label) + '</span>' : '';
       return '<li class="instr-item">' +
         '<div class="instr-num">' + (i + 1) + '</div>' +
         '<div style="flex:1;">' +
-          '<p class="instr-field">' + escHtml(item.field) + '</p>' +
+          '<p class="instr-field">' + escHtml(item.field) + translatedLabel + '</p>' +
           '<p class="instr-text">' + escHtml(item.instruction) + '</p>' +
           warn +
         '</div>' +
@@ -796,9 +893,17 @@
   }
 
   function renderSample(r) {
+    // Build a translated_label lookup from instructions (if available)
+    var instrMap = {};
+    (r.instructions || []).forEach(function(item) {
+      if (item.translated_label) instrMap[item.field] = item.translated_label;
+    });
+
     var rows = (r.sample || []).map(function(item) {
+      var tl = instrMap[item.field]
+        ? '<span class="translated-label">' + escHtml(instrMap[item.field]) + '</span>' : '';
       return '<div class="sample-row">' +
-        '<span class="sample-field">' + escHtml(item.field) + '</span>' +
+        '<span class="sample-field">' + escHtml(item.field) + tl + '</span>' +
         '<span class="sample-arrow">→</span>' +
         '<span class="sample-value">' + escHtml(item.value) + '</span>' +
       '</div>';
@@ -1065,7 +1170,7 @@
     fetch('/api/next-steps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formName: formName, state: state }),
+      body: JSON.stringify({ formName: formName, state: state, lang: lang !== 'en' ? lang : undefined }),
     })
     .then(function(res) { return res.json(); })
     .then(function(d) {

@@ -25,6 +25,11 @@ Tone & style:
 • Never make up URLs — only cite official gov domains (irs.gov, uscis.gov, ssa.gov, etc.)
 • If uncertain, say so clearly rather than guessing`;
 
+const LANG_FULL = {
+  es: 'Spanish', pt: 'Portuguese', fr: 'French', zh: 'Mandarin Chinese',
+  vi: 'Vietnamese', tl: 'Tagalog', ko: 'Korean', ar: 'Arabic',
+};
+
 function buildSystemPrompt(formContext) {
   if (!formContext || !formContext.formName || !Array.isArray(formContext.fields) || !formContext.fields.length) {
     return BASE_SYSTEM_PROMPT;
@@ -60,7 +65,23 @@ function buildSystemPrompt(formContext) {
     }
   }
 
-  return BASE_SYSTEM_PROMPT + `
+  // Language instruction block
+  const lang = formContext.lang;
+  const langName = lang && lang !== 'en' ? LANG_FULL[lang] : null;
+  const langBlock = langName ? `
+
+---
+
+## LANGUAGE REQUIREMENT
+
+Conduct this ENTIRE conversation in **${langName}**. Every response, question, explanation, field label, recap, and summary MUST be in ${langName}.
+
+Key rules:
+- Use jurisdiction-appropriate legal and tax terminology — do NOT translate literally. For example, in Spanish use "número de seguro social", "número de identificación del empleador", "estado civil tributario", "declaración de impuestos"; in French use "numéro de sécurité sociale", "numéro SIRET/SIREN"; in Arabic use "الرقم الضريبي", "الضمان الاجتماعي".
+- All form field VALUES that the user provides must remain in English format as required by the issuing agency (e.g. dates as MM/DD/YYYY, names in Roman characters).
+- In your VERY FIRST message, include a disclaimer in ${langName}: "⚠️ Cette orientation est générée par IA à titre informatif uniquement et ne constitue pas un conseil juridique, fiscal ou d'immigration. Veuillez toujours vérifier auprès de l'agence officielle ou d'un professionnel qualifié." — but translate this disclaimer INTO ${langName} (do not use French unless ${langName} is French).` : '';
+
+  return BASE_SYSTEM_PROMPT + langBlock + `
 
 ---
 
